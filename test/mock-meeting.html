@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Mock meeting</title>
+    <style>
+      body { margin: 0; font: 16px system-ui, sans-serif; background: #10141c; color: #e8ecf3; display: grid; place-items: center; height: 100vh; }
+      .card { text-align: center; }
+      canvas { display: block; background: #1c2333; border-radius: 8px; }
+      input, button { font: inherit; padding: 8px 12px; margin: 6px; }
+      [hidden] { display: none !important; }
+    </style>
+  </head>
+  <body data-state="unknown">
+    <div class="card">
+      <h2 id="title"></h2>
+      <p id="msg"></p>
+      <div id="prejoin" hidden>
+        <input id="name" placeholder="Your Name" />
+        <button id="join">Join</button>
+      </div>
+      <div id="room" hidden>
+        <canvas id="cv" width="960" height="480"></canvas>
+        <p><button id="leave">Leave</button> <span id="who"></span></p>
+      </div>
+    </div>
+    <script>
+      // ?room=A&open=4&end=12  → phòng mở sau 4s kể từ khi tải trang; kết thúc 12s sau khi vào.
+      const q = new URLSearchParams(location.search);
+      const room = q.get('room') || 'A';
+      const openAfter = Number(q.get('open') || 0) * 1000;
+      const endAfter = Number(q.get('end') || 10) * 1000;
+      const freq = Number(q.get('freq') || 440);
+      const $ = (id) => document.getElementById(id);
+      const set = (state, msg) => { document.body.dataset.state = state; $('msg').textContent = msg || ''; };
+      $('title').textContent = 'Mock room ' + room;
+
+      if (q.get('blocked')) {
+        // ?blocked=1: giả lập phòng chặn bot tự động — bot phải dừng lại và báo rõ.
+        set('bot_blocked', "Automated bots aren't allowed to join this meeting.");
+      } else {
+        set('not_started', 'The meeting has not started');
+        setTimeout(() => { set('prejoin', ''); $('prejoin').hidden = false; }, openAfter);
+      }
+
+      let ctx, raf;
+      $('join').onclick = () => {
+        $('prejoin').hidden = true;
+        $('room').hidden = false;
+        $('who').textContent = 'Joined as ' + ($('name').value || '(no name)');
+        set('in_meeting', '');
+        // Phòng đã từng kết thúc trong tab này: giả lập "vào lại phòng trống" như Zoom — vào được nhưng không có tiếng, không tự kết thúc.
+        const emptyRoom = sessionStorage.getItem('ended-' + room) === '1';
+        if (emptyRoom) {
+          $('who').textContent += ' (empty room)';
+          return;
+        }
+        // Âm thanh: một nốt liên tục để kiểm tra việc thu tiếng của tab.
+        ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.frequency.value = freq;
+        gain.gain.value = 0.25;
+        osc.connect(gain).connect(ctx.destination);
+        osc.start();
+        // Hình: ô vuông chạy + đồng hồ để kiểm tra việc thu hình.
+        const cv = $('cv'), g = cv.getContext('2d');
+        const t0 = performance.now();
+        const draw = () => {
+          const t = (performance.now() - t0) / 1000;
+          g.fillStyle = '#1c2333'; g.fillRect(0, 0, cv.width, cv.height);
+          g.fillStyle = '#5b8def'; g.fillRect(((t * 180) % (cv.width + 80)) - 80, 180, 80, 80);
+          g.fillStyle = '#e8ecf3'; g.font = '32px system-ui'; g.fillText('Room ' + room + ' — ' + t.toFixed(1) + 's', 30, 60);
+          raf = requestAnimationFrame(draw);
+        };
+        draw();
+        setTimeout(end, endAfter);
+        // ?speakers=Thầy Nam:3,Lan:1 → các ô người tham dự kiểu Meet; mỗi giây một người "đang nói" theo tỉ lệ đã cho.
+        if (q.get('speakers')) {
+          const ppl = q.get('speakers').split(',').map((x, i) => { const [n, w] = x.split(':'); return { id: i + 1, name: n, w: Number(w) || 1 }; });
+          const wrap = document.createElement('div');
+          wrap.innerHTML = ppl.map((p) => `<div class="tile" data-participant-id="${p.id}"><span data-self-name="${p.name}">${p.name}</span></div>`).join('');
+          $('room').appendChild(wrap);
+          const seq = ppl.flatMap((p) => Array(p.w).fill(p.id));
+          let k = 0;
+          setInterval(() => {
+            const who = seq[k++ % seq.length];
+            for (const t of wrap.querySelectorAll('.tile')) t.classList.toggle('speaking', Number(t.dataset.participantId) === who);
+          }, 1000);
+        }
+        // ?leave=N: phòng có 2 người, sau N giây người kia rời đi (không kết thúc phòng) → bot còn một mình, phòng im lặng.
+        if (q.get('leave')) {
+          document.body.dataset.people = '2';
+          setTimeout(() => {
+            if (document.body.dataset.state !== 'in_meeting') return;
+            document.body.dataset.people = '1';
+            gain.gain.value = 0;
+            $('who').textContent += ' — everyone else left';
+          }, Number(q.get('leave')) * 1000);
+        }
+      };
+      const end = () => {
+        if (document.body.dataset.state !== 'in_meeting') return;
+        sessionStorage.setItem('ended-' + room, '1');
+        cancelAnimationFrame(raf);
+        if (ctx) ctx.close();
+        $('room').hidden = true;
+        set('ended', 'This meeting has been ended by host');
+      };
+      $('leave').onclick = end;
+    </script>
+  </body>
+</html>

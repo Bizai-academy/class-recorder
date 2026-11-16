@@ -1,0 +1,1193 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Class Recorder</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1b2130; --muted: #5f6b7e; --border: #dfe3ea; --field: #ffffff;
+    --accent: #2456d6; --accent-text: #ffffff; --accent-soft: #e8eefc;
+    --ok: #17794a; --ok-soft: #e3f5ea; --warn: #9a5200; --warn-soft: #fdf0dc; --danger: #c0271b; --danger-soft: #fde8e6;
+    --shadow: 0 1px 2px rgba(20, 30, 50, .06), 0 4px 14px rgba(20, 30, 50, .05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151c; --card: #1b202b; --text: #e7eaf0; --muted: #9aa4b5; --border: #2d3442; --field: #141821;
+      --accent: #6d95f5; --accent-text: #0e1320; --accent-soft: #232d47;
+      --ok: #5fd39a; --ok-soft: #173326; --warn: #f0b35c; --warn-soft: #3a2c14; --danger: #ff8a7d; --danger-soft: #3d1c19;
+      --shadow: none;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { font-size: 15px; }
+  body { margin: 0; background: var(--bg); color: var(--text); font-family: "Segoe UI", system-ui, -apple-system, Roboto, sans-serif; line-height: 1.5; }
+  header { position: sticky; top: 0; z-index: 5; background: var(--card); border-bottom: 1px solid var(--border); }
+  .bar { max-width: 1120px; margin: 0 auto; padding: 0 20px; display: flex; align-items: center; gap: 20px; height: 56px; }
+  .brand { font-weight: 650; font-size: 1.07rem; white-space: nowrap; }
+  nav { display: flex; gap: 2px; flex: 1; }
+  nav button { background: none; border: 0; color: var(--muted); font: inherit; font-weight: 550; padding: 17px 12px 15px; border-bottom: 2px solid transparent; cursor: pointer; white-space: nowrap; }
+  nav button:hover { color: var(--text); }
+  nav button.on { color: var(--accent); border-bottom-color: var(--accent); }
+  .pill { display: inline-flex; align-items: center; gap: 7px; padding: 3px 11px; border-radius: 999px; font-size: .87rem; font-weight: 550; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+  .pill::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+  .pill.rec { background: var(--danger-soft); color: var(--danger); }
+  .pill.rec::before { animation: blink 1.2s infinite; }
+  .pill.ok { background: var(--ok-soft); color: var(--ok); }
+  .pill.warn { background: var(--warn-soft); color: var(--warn); }
+  .pill.err { background: var(--danger-soft); color: var(--danger); }
+  .pill.plain::before { display: none; }
+  @keyframes blink { 50% { opacity: .25; } }
+  main { max-width: 1120px; margin: 0 auto; padding: 24px 20px 80px; }
+  .tab[hidden] { display: none; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 22px; box-shadow: var(--shadow); margin-bottom: 18px; }
+  h2 { font-size: 1.2rem; margin: 0 0 14px; font-weight: 650; }
+  h3 { font-size: 1rem; margin: 0 0 12px; font-weight: 650; }
+  label { display: block; font-weight: 550; font-size: .93rem; margin-bottom: 14px; }
+  label .opt { color: var(--muted); font-weight: 400; }
+  input[type=text], input[type=password], input[type=number], input[type=url], select {
+    display: block; width: 100%; margin-top: 6px; padding: 9px 11px; font: inherit; color: var(--text);
+    background: var(--field); border: 1px solid var(--border); border-radius: 8px;
+  }
+  input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .check { display: flex; align-items: center; gap: 9px; font-weight: 450; }
+  .check input { width: 17px; height: 17px; margin: 0; accent-color: var(--accent); }
+  .help { display: block; color: var(--muted); font-weight: 400; font-size: .87rem; margin-top: 5px; }
+  .btn { display: inline-block; font: inherit; font-weight: 600; padding: 9px 16px; border-radius: 8px; border: 1px solid var(--border); background: var(--card); color: var(--text); cursor: pointer; text-decoration: none; white-space: nowrap; }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .btn.danger { color: var(--danger); border-color: var(--danger); }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn.small { padding: 5px 11px; font-size: .88rem; font-weight: 550; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .note { border-radius: 8px; padding: 10px 13px; font-size: .92rem; margin: 0 0 14px; }
+  .note.warn { background: var(--warn-soft); color: var(--warn); }
+  .note.err { background: var(--danger-soft); color: var(--danger); }
+  .note.info { background: var(--accent-soft); color: var(--text); }
+  .muted { color: var(--muted); }
+  .steps { display: flex; gap: 6px; margin: 4px 0 16px; }
+  .steps div { flex: 1; font-size: .83rem; color: var(--muted); padding-top: 9px; border-top: 3px solid var(--border); }
+  .steps div.done { border-color: var(--ok); color: var(--text); }
+  .steps div.now { border-color: var(--accent); color: var(--accent); font-weight: 650; }
+  .meta { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px 20px; margin: 0 0 18px; }
+  .meta dt { color: var(--muted); font-size: .83rem; }
+  .meta dd { margin: 0; font-weight: 550; overflow-wrap: anywhere; }
+  .head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
+  .head h2 { margin: 0; }
+  .inline { display: flex; gap: 10px; align-items: flex-end; }
+  .inline label { flex: 1; margin: 0; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 18px 0; }
+  details { margin-top: 14px; }
+  summary { cursor: pointer; font-weight: 550; color: var(--muted); }
+  pre.log { background: var(--field); border: 1px solid var(--border); border-radius: 8px; padding: 12px; font: .82rem/1.5 Consolas, "Cascadia Mono", monospace; max-height: 300px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 10px 0 0; }
+  img.shot { display: block; max-width: 100%; border: 1px solid var(--border); border-radius: 8px; margin-top: 10px; }
+  .split { display: grid; grid-template-columns: 300px 1fr; gap: 18px; align-items: start; }
+  .list { background: var(--card); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: var(--shadow); }
+  .list button { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--border); padding: 12px 14px; font: inherit; color: var(--text); cursor: pointer; }
+  .list button:last-child { border-bottom: 0; }
+  .list button:hover { background: var(--accent-soft); }
+  .list button.on { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+  .list .t { font-weight: 600; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .list .d { color: var(--muted); font-size: .85rem; }
+  .empty { color: var(--muted); padding: 28px 16px; text-align: center; }
+  video { display: block; width: 100%; max-height: 62vh; background: #000; border-radius: 8px; margin-bottom: 16px; }
+  .subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .subtabs button { background: none; border: 0; font: inherit; font-weight: 550; color: var(--muted); padding: 8px 12px; border-bottom: 2px solid transparent; cursor: pointer; margin-bottom: -1px; }
+  .subtabs button.on { color: var(--accent); border-bottom-color: var(--accent); }
+  .doc { max-width: 76ch; overflow-wrap: anywhere; }
+  .doc h1 { font-size: 1.3rem; margin: 0 0 12px; }
+  .doc h2 { font-size: 1.08rem; margin: 22px 0 8px; }
+  .doc h3, .doc h4 { font-size: 1rem; margin: 16px 0 6px; }
+  .doc p { margin: 0 0 10px; }
+  .doc ul, .doc ol { margin: 0 0 10px; padding-left: 22px; }
+  .doc li { margin-bottom: 4px; }
+  .doc code { background: var(--field); border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; font-size: .9em; }
+  .doc blockquote { margin: 0 0 10px; padding: 6px 12px; border-left: 3px solid var(--border); color: var(--muted); }
+  a.ts { color: var(--accent); text-decoration: none; font-variant-numeric: tabular-nums; font-weight: 550; }
+  a.ts:hover { text-decoration: underline; }
+  .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; align-items: center; }
+  .secret { display: flex; gap: 8px; margin-top: 6px; }
+  .secret input { margin-top: 0; }
+  .savebar { position: sticky; bottom: 0; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px 18px; display: flex; align-items: center; gap: 14px; box-shadow: 0 -2px 14px rgba(20, 30, 50, .08); }
+  #toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 18px; border-radius: 8px; font-weight: 550; opacity: 0; pointer-events: none; transition: opacity .2s; max-width: 90vw; z-index: 20; }
+  #toast.show { opacity: 1; }
+  #toast.err { background: var(--danger); color: #fff; }
+  @media (max-width: 780px) {
+    .row, .split { grid-template-columns: 1fr; }
+    .inline { flex-direction: column; align-items: stretch; }
+    .steps div { font-size: .72rem; }
+    .bar { gap: 10px; padding: 0 12px; }
+    .brand { display: none; }
+    main { padding: 16px 12px 80px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="bar">
+    <div class="brand">Class Recorder</div>
+    <nav>
+      <button data-tab="record" class="on">Ghi hình</button>
+      <button data-tab="sessions">Buổi đã ghi</button>
+      <button data-tab="settings">Cài đặt</button>
+    </nav>
+    <span id="pill" class="pill">Đang kết nối</span>
+    <div style="position: relative">
+      <button id="bell" class="btn small" title="Thông báo" aria-label="Thông báo">🔔 <span id="bell-count" class="pill err plain" style="padding:0 7px;font-size:.78rem" hidden></span></button>
+      <div id="bell-panel" class="card" hidden style="position:absolute;right:0;top:44px;width:min(380px,92vw);max-height:70vh;overflow:auto;z-index:10;padding:14px">
+        <div class="head" style="margin-bottom:8px"><h3 style="margin:0">Thông báo</h3><button class="btn small" id="bell-perm" hidden>Bật thông báo bật lên</button></div>
+        <div id="bell-list"></div>
+      </div>
+    </div>
+    <a id="logout" class="btn small" href="/logout" hidden>Đăng xuất</a>
+  </div>
+</header>
+
+<main>
+  <!-- ───────────── Ghi hình ───────────── -->
+  <section id="tab-record" class="tab">
+    <div id="run-tabs" class="actions" hidden style="margin-bottom: 12px"></div>
+    <div id="start-card" class="card">
+      <h2>Ghi một buổi học</h2>
+      <label>Link phòng học
+        <input type="url" id="f-url" placeholder="https://zoom.us/j/…  hoặc  https://meet.google.com/…" autocomplete="off">
+      </label>
+      <div class="row">
+        <label>Tên buổi học
+          <input type="text" id="f-title" placeholder="Ví dụ: Toán cao cấp - buổi 5">
+        </label>
+        <label>Mật khẩu phòng Zoom <span class="opt">(nếu link không kèm sẵn)</span>
+          <input type="text" id="f-pass" autocomplete="off">
+        </label>
+      </div>
+      <label class="check"><input type="checkbox" id="f-summary" checked> Tạo bản phiên âm và tóm tắt sau buổi học</label>
+      <div id="key-warn" class="note warn" hidden></div>
+      <div class="actions">
+        <button id="btn-start" class="btn primary">Bắt đầu ghi</button>
+        <span class="muted">Bot chờ đến khi phòng mở, tự vào lớp và ghi đến khi phòng đóng.</span>
+      </div>
+    </div>
+
+    <div id="live-card" class="card" hidden>
+      <div class="head">
+        <h2 id="l-title"></h2>
+        <span id="l-pill" class="pill"></span>
+      </div>
+      <div class="steps" id="l-steps">
+        <div>Chờ phòng mở</div><div>Vào phòng</div><div>Đang ghi</div><div>Xử lý file</div><div>Hoàn tất</div>
+      </div>
+      <p id="l-msg" class="note info"></p>
+      <div id="l-attn" class="note warn" hidden>
+        <strong id="l-attn-title"></strong>
+        <div id="l-attn-text" style="margin: 4px 0 10px"></div>
+        <div class="actions">
+          <button id="btn-attn-stop" class="btn primary">Dừng ghi và xuất file</button>
+          <button id="btn-attn-keep" class="btn">Chờ thêm</button>
+        </div>
+      </div>
+      <dl class="meta">
+        <div><dt>Nền tảng</dt><dd id="l-platform"></dd></div>
+        <div><dt>Bắt đầu lúc</dt><dd id="l-start"></dd></div>
+        <div><dt>Đã chạy</dt><dd id="l-elapsed"></dd></div>
+        <div><dt>Số đoạn đã ghi</dt><dd id="l-seg"></dd></div>
+        <div><dt>Tiếng trong phòng</dt><dd id="l-audio"></dd></div>
+        <div><dt>Số người trong phòng</dt><dd id="l-people"></dd></div>
+        <div style="grid-column: 1 / -1"><dt>Phòng hiện tại</dt><dd id="l-url"></dd></div>
+      </dl>
+      <div id="l-controls">
+      <hr>
+      <h3>Lớp đổi sang phòng khác?</h3>
+      <div class="inline">
+        <label>Link phòng mới
+          <input type="url" id="r-url" placeholder="Dán link mới vào đây" autocomplete="off">
+        </label>
+        <button id="btn-rejoin" class="btn">Đổi phòng</button>
+      </div>
+      <p class="help">Bot rời phòng cũ, vào phòng mới và ghi tiếp vào cùng một video.</p>
+      <hr>
+      <div class="actions">
+        <button id="btn-stop" class="btn danger">Dừng ghi và xuất file</button>
+      </div>
+      </div>
+      <details id="l-shot-box" open>
+        <summary>Bot đang thấy gì</summary>
+        <img id="l-shot" class="shot" alt="Ảnh chụp màn hình gần nhất của bot" hidden>
+        <p id="l-shot-none" class="muted">Chưa có ảnh chụp.</p>
+        <p id="l-shot-time" class="help"></p>
+      </details>
+      <details>
+        <summary>Nhật ký</summary>
+        <pre id="l-log" class="log"></pre>
+      </details>
+    </div>
+
+    <div id="last-card" class="card" hidden></div>
+
+    <div id="sched-card" class="card">
+      <h2>Lịch ghi tự động</h2>
+      <p class="muted" style="margin: -6px 0 14px">Tới giờ, bot tự bắt đầu ghi như khi bạn bấm Bắt đầu ghi. Nên đặt sớm hơn giờ học 5 phút: bot sẽ chờ phòng mở. Giờ tính theo đồng hồ của máy đang chạy app: <strong id="sched-clock">…</strong>.</p>
+      <div id="cal-status" class="actions" style="margin-bottom: 12px"></div>
+      <div id="sched-list"></div>
+      <details id="sched-form">
+        <summary>Thêm lịch</summary>
+        <div style="margin-top: 14px">
+          <label>Link phòng học
+            <input type="url" id="sc-url" placeholder="https://zoom.us/j/…  hoặc  https://meet.google.com/…" autocomplete="off">
+          </label>
+          <div class="row">
+            <label>Tên lớp
+              <input type="text" id="sc-title" placeholder="Ví dụ: Toán cao cấp">
+            </label>
+            <label>Giờ bắt đầu ghi
+              <input type="time" id="sc-time" value="19:25" style="display:block;width:100%;margin-top:6px;padding:9px 11px;font:inherit;color:var(--text);background:var(--field);border:1px solid var(--border);border-radius:8px">
+            </label>
+          </div>
+          <label>Lặp lại vào các thứ</label>
+          <div class="actions" id="sc-days" style="margin: -6px 0 14px">
+            <label class="check" style="margin:0"><input type="checkbox" value="1"> T2</label>
+            <label class="check" style="margin:0"><input type="checkbox" value="2"> T3</label>
+            <label class="check" style="margin:0"><input type="checkbox" value="3"> T4</label>
+            <label class="check" style="margin:0"><input type="checkbox" value="4"> T5</label>
+            <label class="check" style="margin:0"><input type="checkbox" value="5"> T6</label>
+            <label class="check" style="margin:0"><input type="checkbox" value="6"> T7</label>
+            <label class="check" style="margin:0"><input type="checkbox" value="0"> CN</label>
+          </div>
+          <div class="row">
+            <label>Hoặc chỉ một ngày <span class="opt">(để trống nếu lặp theo thứ)</span>
+              <input type="date" id="sc-date" style="display:block;width:100%;margin-top:6px;padding:9px 11px;font:inherit;color:var(--text);background:var(--field);border:1px solid var(--border);border-radius:8px">
+            </label>
+            <label>Mật khẩu phòng Zoom <span class="opt">(nếu cần)</span>
+              <input type="text" id="sc-pass" autocomplete="off">
+            </label>
+          </div>
+          <label class="check"><input type="checkbox" id="sc-summary" checked> Tạo bản phiên âm và tóm tắt sau buổi học</label>
+          <button id="btn-sched-add" class="btn primary">Lưu lịch</button>
+        </div>
+      </details>
+    </div>
+  </section>
+
+  <!-- ───────────── Buổi đã ghi ───────────── -->
+  <section id="tab-sessions" class="tab" hidden>
+    <div class="card" id="search-card">
+      <div class="head"><h2>Tìm trong các buổi học</h2><span class="muted" id="disk-free"></span></div>
+      <div class="inline">
+        <label>Từ khoá <span class="opt">(không cần gõ dấu)</span>
+          <input type="search" id="search-q" placeholder="Ví dụ: dao ham, Twilio, bài tập" autocomplete="off">
+        </label>
+        <button id="btn-search" class="btn">Tìm</button>
+      </div>
+      <div id="search-out" hidden style="margin-top: 12px"></div>
+    </div>
+    <div class="card" id="ask-card">
+      <h2>Hỏi về các buổi học</h2>
+      <div class="inline">
+        <label>Câu hỏi
+          <input type="text" id="ask-q" placeholder="Ví dụ: Buổi nào giảng về đạo hàm? Bài tập về nhà tuần này là gì?" autocomplete="off">
+        </label>
+        <button id="btn-ask" class="btn primary">Hỏi</button>
+      </div>
+      <p class="help">Trả lời dựa trên bản tóm tắt và phiên âm của các buổi đã ghi. Bấm vào trích dẫn như [B2 00:12:30] để mở đúng buổi và tua tới đó. Mỗi câu hỏi tốn khoảng vài xu tiền Claude.</p>
+      <div id="ask-out" class="doc" hidden style="margin-top: 12px"></div>
+    </div>
+    <div class="split">
+      <div id="sess-list" class="list"></div>
+      <div id="sess-detail" class="card"><p class="empty">Chọn một buổi ở danh sách bên trái.</p></div>
+    </div>
+  </section>
+
+  <!-- ───────────── Cài đặt ───────────── -->
+  <section id="tab-settings" class="tab" hidden>
+    <div id="settings-groups"></div>
+    <div class="savebar">
+      <button id="btn-save" class="btn primary">Lưu cài đặt</button>
+      <span id="save-state" class="muted">Cài đặt áp dụng từ buổi ghi tiếp theo.</span>
+    </div>
+    <div class="card" id="pw-card" style="margin-top: 18px" hidden>
+      <h2>Mật khẩu đăng nhập</h2>
+      <div class="row">
+        <label>Mật khẩu hiện tại
+          <input type="password" id="pw-current" autocomplete="current-password">
+        </label>
+        <label>Mật khẩu mới <span class="opt">(ít nhất 10 ký tự)</span>
+          <input type="password" id="pw-next" autocomplete="new-password">
+        </label>
+      </div>
+      <button class="btn" id="btn-pw">Đổi mật khẩu</button>
+      <span class="help">Các trình duyệt đã đăng nhập vẫn giữ phiên; mật khẩu mới áp dụng cho lần đăng nhập sau.</span>
+    </div>
+    <div class="card" style="margin-top: 18px">
+      <h2>Kiểm tra</h2>
+      <div class="actions">
+        <button class="btn" data-tool="stt">Kiểm tra phiên âm</button>
+        <button class="btn" data-tool="summary">Kiểm tra tóm tắt</button>
+        <button class="btn" data-tool="selftest">Tự kiểm thử ghi hình</button>
+        <button class="btn" data-tool="setup-stt">Cài bộ phiên âm trên máy</button>
+        <button class="btn" data-tool="login">Đăng nhập Google/Zoom cho bot</button>
+      </div>
+      <p class="help">Kiểm tra phiên âm gửi một câu mẫu ngắn tới dịch vụ đã cài, kiểm tra tóm tắt gửi một bản phiên âm mẫu tới Claude (lưu cài đặt trước; mỗi lần tốn chưa tới 0,05 USD). Tự kiểm thử mở trình duyệt và ghi một phòng học giả lập trong khoảng 1 phút. Đăng nhập mở trình duyệt để bạn tự đăng nhập, xong thì đóng cửa sổ đó lại.</p>
+      <pre id="tool-out" class="log" hidden></pre>
+      <div id="vnc-panel" hidden style="margin-top: 14px">
+        <p class="note info">Đây là trình duyệt của bot đang chạy trên máy chủ. Hãy tự đăng nhập tài khoản của bạn trong khung dưới đây, rồi bấm <strong>Xong, lưu đăng nhập</strong>. Mật khẩu bạn gõ đi thẳng tới trang đăng nhập, bot không lưu lại.</p>
+        <div class="actions" style="margin-bottom: 10px">
+          <button class="btn primary" id="btn-vnc-done">Xong, lưu đăng nhập</button>
+          <a class="btn" id="vnc-newtab" target="_blank" rel="noopener">Mở khung này ở tab riêng</a>
+        </div>
+        <iframe id="vnc-frame" title="Trình duyệt của bot" style="width: 100%; height: 640px; border: 1px solid var(--border); border-radius: 8px; background: #000"></iframe>
+      </div>
+    </div>
+  </section>
+</main>
+<div id="toast" role="status"></div>
+
+<script>
+const TOKEN = '__TOKEN__';
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function api(path, body) {
+  const res = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json', 'x-classrec-token': TOKEN }, body: JSON.stringify(body) });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) location.href = '/login'; // phiên đăng nhập hết hạn (khi dùng từ xa)
+  if (!res.ok) throw new Error(data.error || `Lỗi ${res.status}`);
+  return data;
+}
+
+let toastTimer;
+function toast(msg, isErr) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.className = 'show' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => (t.className = ''), isErr ? 6000 : 3200);
+}
+const fail = (e) => toast(e.message, true);
+
+const PHASE = {
+  starting: 'Đang khởi động', waiting_open: 'Chờ phòng mở', joining: 'Đang vào phòng', waiting_admit: 'Chờ được duyệt vào',
+  recording: 'Đang ghi', grace: 'Phòng đã đóng, chờ đổi phòng', finalizing: 'Đang xử lý file', done: 'Hoàn tất', error: 'Kết thúc có lỗi', unknown: 'Không rõ',
+};
+const STEP = { starting: 0, waiting_open: 0, joining: 1, waiting_admit: 1, recording: 2, grace: 2, finalizing: 3, done: 4, error: 4 };
+const PLATFORM = { zoom: 'Zoom', meet: 'Google Meet', mock: 'Phòng giả lập' };
+const pillClass = (p) => (p === 'recording' ? 'rec' : p === 'done' ? 'ok' : p === 'error' ? 'err' : p === 'grace' ? 'warn' : '');
+
+function fmtDur(sec) {
+  sec = Math.max(0, Math.round(sec || 0));
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  if (h) return `${h} giờ ${m} phút`;
+  if (m) return `${m} phút ${s} giây`;
+  return `${s} giây`;
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso), p = (n) => String(n).padStart(2, '0');
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/* ───────────── Tab ───────────── */
+function switchTab(name) {
+  $$('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === name));
+  $$('.tab').forEach((s) => (s.hidden = s.id !== `tab-${name}`));
+  if (name === 'settings' && !settingsLoaded) loadSettings().catch(fail);
+}
+$$('nav button').forEach((b) => (b.onclick = () => switchTab(b.dataset.tab)));
+
+/* ───────────── Trạng thái chung ───────────── */
+let state = null;
+let prevRunningIds = [];
+let viewId = null; // buổi đang chạy được hiện ở tab Ghi hình; 'new' = đang mở khung ghi thêm lớp
+let lastShotShown = null;
+
+async function tick() {
+  let delay = 5000;
+  try {
+    state = await api('/api/state');
+    const all = state.runningAll || (state.running ? [state.running] : []);
+    const canAdd = all.length > 0 && all.length < (state.maxParallel || 1);
+    if (viewId === 'new' ? !canAdd : !all.some((s) => s.id === viewId)) viewId = all[0] ? all[0].id : null;
+    const run = viewId === 'new' ? null : all.find((s) => s.id === viewId) || null;
+    state.running = run; // các phần còn lại của giao diện làm việc với buổi đang được chọn
+    const pill = $('#pill');
+    pill.className = 'pill ' + (all.length ? pillClass((run || all[0]).phase) : 'ok');
+    pill.textContent = all.length > 1 ? `Đang ghi ${all.length} lớp` : all.length ? PHASE[all[0].phase] || all[0].phase : 'Sẵn sàng';
+    renderRunTabs(all, canAdd);
+
+    if (all.length) delay = 2000;
+    if (run) renderLive(await api('/api/session/' + run.id));
+    const ended = prevRunningIds.filter((id) => !all.some((s) => s.id === id));
+    prevRunningIds = all.map((s) => s.id);
+    if (ended.length) {
+      const done = state.sessions.find((s) => s.id === ended[0]);
+      toast(`Buổi ghi "${done ? done.title : ''}" đã kết thúc.`);
+      if (!all.length) {
+        selectSession(ended[0]);
+        switchTab('sessions');
+      }
+    }
+    $('#logout').hidden = !(state.server && state.server.auth);
+    $('#pw-card').hidden = !(state.server && state.server.auth);
+    $('#start-card').hidden = !!run;
+    $('#live-card').hidden = !run;
+    if (!run) renderAttention(null);
+    renderKeyWarn();
+    renderBell(state.notifications || []);
+    if (state.server && state.server.diskFree != null) $("#disk-free").textContent = `Đĩa còn trống: ${(state.server.diskFree / 1e9).toFixed(1)} GB`;
+    renderLast();
+    renderList();
+    if (selectedId && !state.sessions.some((s) => s.id === selectedId)) {
+      // Buổi đang xem đã bị xoá khỏi máy → bỏ chọn, không hỏi lại máy chủ nữa.
+      selectedId = null;
+      detailSig = null;
+      $('#sess-detail').innerHTML = '<p class="empty">Chọn một buổi ở danh sách bên trái.</p>';
+    }
+    if (selectedId) refreshDetail().catch(() => {});
+  } catch (e) {
+    const pill = $('#pill');
+    pill.className = 'pill err';
+    pill.textContent = 'Mất kết nối';
+  }
+  tickTimer = setTimeout(tick, delay);
+}
+let tickTimer = null;
+const tickNow = () => {
+  clearTimeout(tickTimer);
+  tick();
+};
+
+function renderKeyWarn() {
+  const w = $('#key-warn');
+  const wants = $('#f-summary').checked;
+  const k = state.keys;
+  let msg = '';
+  if (wants && !k.stt) msg = k.sttLocal ? 'Bạn chọn phiên âm trên máy nhưng chưa cài bộ phiên âm, nên buổi này sẽ chỉ có video. Vào tab Cài đặt, bấm "Cài bộ phiên âm trên máy".' : 'Chưa có API key phiên âm nên buổi này sẽ chỉ có video. Thêm key ở tab Cài đặt.';
+  else if (wants && !k.anthropic) msg = 'Chưa có API key Claude nên buổi này sẽ có video và bản phiên âm, chưa có file tóm tắt. Thêm key ở tab Cài đặt.';
+  w.hidden = !msg;
+  w.textContent = msg;
+}
+$('#f-summary').onchange = () => state && renderKeyWarn();
+
+function renderLive(d) {
+  $('#l-title').textContent = d.title;
+  const lp = $('#l-pill');
+  lp.className = 'pill ' + pillClass(d.phase);
+  lp.textContent = PHASE[d.phase] || d.phase;
+  const step = STEP[d.phase] ?? 0;
+  $$('#l-steps div').forEach((el, i) => (el.className = i < step ? 'done' : i === step ? 'now' : ''));
+  $('#l-msg').textContent = d.message || '';
+  $('#l-platform').textContent = PLATFORM[d.platform] || d.platform || '…';
+  $('#l-start').textContent = fmtDate(d.startedAt);
+  $('#l-elapsed').textContent = fmtDur((Date.now() - new Date(d.startedAt).getTime()) / 1000);
+  $('#l-seg').textContent = d.phase === 'recording' ? `${d.segments} (đang ghi đoạn ${d.segments + 1})` : String(d.segments);
+  $('#l-url').textContent = d.url || '';
+  const recording = d.phase === 'recording';
+  const silent = d.audio ? d.audio.silentSeconds : null;
+  $('#l-audio').textContent = !recording || silent === null ? '…' : silent < 20 ? 'Đang có tiếng' : `Im lặng ${fmtDur(silent)}`;
+  $('#l-people').textContent = recording && d.participants !== null ? String(d.participants) : '…';
+  renderAttention(d);
+  // Đang xử lý file: bot đã rời phòng, nên ẩn phần đổi phòng / dừng ghi và ảnh màn hình.
+  const busy = d.phase === 'finalizing';
+  $('#l-controls').hidden = busy;
+  $('#l-shot-box').hidden = busy;
+  const log = $('#l-log');
+  const atBottom = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
+  log.textContent = d.log || '';
+  if (atBottom) log.scrollTop = log.scrollHeight;
+  // Ưu tiên ảnh trực tiếp (bot chụp lại mỗi 10 giây); chưa có thì dùng ảnh lúc đổi trạng thái gần nhất.
+  const src = d.liveAt ? `/files/${d.id}/live.jpg?t=${d.liveAt}` : d.lastShot ? `/files/${d.id}/debug/${d.lastShot}` : null;
+  if (src !== lastShotShown) {
+    lastShotShown = src;
+    const img = $('#l-shot');
+    img.hidden = !src;
+    $('#l-shot-none').hidden = !!src;
+    if (src) img.src = src;
+    $('#l-shot-time').textContent = d.liveAt ? `Chụp lúc ${new Date(d.liveAt).toLocaleTimeString('vi-VN')}, cập nhật mỗi 10 giây.` : src ? 'Ảnh chụp lúc bot đổi trạng thái gần nhất.' : '';
+  }
+}
+
+/* ───────────── Chuông thông báo ───────────── */
+// Thông báo do bot lưu trên máy chủ; trang hiện chúng ở chuông và, nếu được phép, bật thông báo của trình duyệt.
+let seenNotif = null; // các mã đã thấy; null = lần tải đầu (không bật lên thông báo cũ)
+function renderBell(list) {
+  const unread = list.filter((n) => !n.read).length;
+  const badge = $('#bell-count');
+  badge.hidden = !unread;
+  badge.textContent = unread > 9 ? '9+' : String(unread);
+  const canAsk = 'Notification' in window && Notification.permission === 'default';
+  $('#bell-perm').hidden = !canAsk;
+  const sig = list.map((n) => n.id + (n.read ? 1 : 0)).join(',');
+  const box = $('#bell-list');
+  if (box.dataset.sig !== sig) {
+    box.dataset.sig = sig;
+    box.innerHTML = list.length
+      ? list.map((n) => `<div style="padding:9px 0;border-top:1px solid var(--border)${n.read ? ';opacity:.7' : ''}"><div class="muted" style="font-size:.8rem">${esc(fmtDate(n.at))}</div><div style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(n.text)}</div></div>`).join('')
+      : '<p class="muted">Chưa có thông báo nào.</p>';
+  }
+  const fresh = seenNotif ? list.filter((n) => !seenNotif.has(n.id)) : [];
+  seenNotif = new Set(list.map((n) => n.id));
+  for (const n of fresh.reverse()) {
+    toast(n.text.split('\n')[0]);
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        const pop = new Notification('Class Recorder', { body: n.text, tag: 'classrec-' + n.id });
+        pop.onclick = () => { window.focus(); pop.close(); };
+      } catch (e) { /* trình duyệt không cho hiện thông báo */ }
+    }
+  }
+}
+$('#bell').onclick = async (e) => {
+  e.stopPropagation();
+  const panel = $('#bell-panel');
+  panel.hidden = !panel.hidden;
+  if (!panel.hidden && state && (state.notifications || []).some((n) => !n.read)) {
+    try {
+      await api('/api/notifications/read', {});
+      state = await api('/api/state');
+      renderBell(state.notifications || []);
+    } catch (err) { /* thử lại ở lần làm mới sau */ }
+  }
+};
+$('#bell-perm').onclick = (e) => {
+  e.stopPropagation();
+  askNotifyPermission();
+  setTimeout(() => state && renderBell(state.notifications || []), 1500);
+};
+$('#bell-panel').onclick = (e) => e.stopPropagation();
+document.addEventListener('click', () => ($('#bell-panel').hidden = true));
+
+/* Trạng thái đồng bộ lịch Google (đặt địa chỉ iCal ở tab Cài đặt). */
+function renderCalendarStatus(c) {
+  const box = $('#cal-status');
+  if (!c || !c.configured) {
+    box.innerHTML = '<span class="muted">Muốn tự tạo lịch từ Google Calendar? Dán "địa chỉ bí mật iCal" ở tab Cài đặt, mục Lịch Google.</span>';
+    return;
+  }
+  const when = c.at ? new Date(c.at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+  box.innerHTML = c.error
+    ? `<span class="pill err plain">Lịch Google: ${esc(c.error)}</span>`
+    : `<span class="pill ok plain">Lịch Google: đã đồng bộ${when ? ' lúc ' + esc(when) : ''} · ${c.events ?? 0} buổi sắp tới</span>`;
+  box.insertAdjacentHTML('beforeend', '<button class="btn small" id="btn-cal-sync">Đồng bộ ngay</button>');
+  $('#btn-cal-sync').onclick = async () => {
+    try {
+      const r = await api('/api/calendar-sync', {});
+      if (r.calendar.error) fail(new Error(r.calendar.error));
+      else toast(`Đã đồng bộ: thêm ${r.calendar.added}, sửa ${r.calendar.updated}, gỡ ${r.calendar.removed}.`);
+      await loadSchedules();
+    } catch (e) {
+      fail(e);
+    }
+  };
+}
+
+/* ───────────── Lịch ghi tự động ───────────── */
+const DAY_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+async function loadSchedules() {
+  const { schedules, now, tz, calendar } = await api('/api/schedules');
+  renderCalendarStatus(calendar);
+  $('#sched-clock').textContent = `${new Date(now).toLocaleString('vi-VN', { weekday: 'short', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })} (${tz})`;
+  const box = $('#sched-list');
+  if (!schedules.length) return void (box.innerHTML = '<p class="muted">Chưa có lịch nào.</p>');
+  box.innerHTML = schedules
+    .map((s) => {
+      const when = s.date ? `ngày ${s.date.split('-').reverse().join('/')}` : [1, 2, 3, 4, 5, 6, 0].filter((d) => s.days.includes(d)).map((d) => DAY_NAMES[d]).join(', ');
+      return `<div class="head" style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px">
+        <div style="min-width:0"><strong>${esc(s.title)}</strong>${s.source === "calendar" ? " <span class=\"pill plain\" style=\"font-size:.75rem;padding:0 8px\">từ lịch Google</span>" : ""} · ${esc(s.time)} · ${esc(when)}${s.summary ? '' : ' · chỉ video'}
+          <div class="muted" style="font-size:.85rem;overflow-wrap:anywhere">${esc(s.url)}${s.lastFired ? ` · chạy gần nhất: ${esc(s.lastFired.split('-').reverse().join('/'))}` : ''}</div></div>
+        <div class="actions">
+          <label class="check" style="margin:0"><input type="checkbox" data-sched-toggle="${esc(s.id)}" ${s.enabled ? 'checked' : ''}> Bật</label>
+          <button class="btn small danger" data-sched-del="${esc(s.id)}">Xoá</button>
+        </div></div>`;
+    })
+    .join('');
+  $$('[data-sched-toggle]', box).forEach((el) => (el.onchange = () => api('/api/schedules/toggle', { id: el.dataset.schedToggle, enabled: el.checked }).catch(fail)));
+  $$('[data-sched-del]', box).forEach((el) => (el.onclick = async () => {
+    if (!confirm('Xoá lịch ghi này?')) return;
+    try {
+      await api('/api/schedules/delete', { id: el.dataset.schedDel });
+      await loadSchedules();
+    } catch (e) {
+      fail(e);
+    }
+  }));
+}
+$('#btn-sched-add').onclick = async () => {
+  askNotifyPermission();
+  try {
+    await api('/api/schedules', {
+      url: $('#sc-url').value, title: $('#sc-title').value, time: $('#sc-time').value, date: $('#sc-date').value, passcode: $('#sc-pass').value,
+      days: $$('#sc-days input:checked').map((el) => Number(el.value)), summary: $('#sc-summary').checked,
+    });
+    $('#sc-url').value = '';
+    $('#sc-title').value = '';
+    $('#sc-pass').value = '';
+    $('#sched-form').open = false;
+    toast('Đã lưu lịch. Bot sẽ tự bắt đầu ghi khi tới giờ.');
+    await loadSchedules();
+  } catch (e) {
+    fail(e);
+  }
+};
+
+/* Bot cần người dùng quyết định (đang một mình trong phòng, hoặc phòng im lặng hoàn toàn). */
+let lastAttnKey = null;
+const clock = (iso) => new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+function renderAttention(d) {
+  const a = d && d.attention;
+  const box = $('#l-attn');
+  box.hidden = !a;
+  document.title = a ? '⚠ Bot cần bạn quyết định — Class Recorder' : 'Class Recorder';
+  if (!a) return void (lastAttnKey = null);
+  const alone = a.reason === 'alone';
+  const title = alone ? 'Bot đang ở một mình trong phòng' : 'Phòng im lặng hoàn toàn';
+  const mins = Math.max(1, Math.round((Date.now() - new Date(a.since).getTime()) / 60000));
+  $('#l-attn-title').textContent = title;
+  $('#l-attn-text').textContent =
+    `${alone ? 'Mọi người đã rời phòng' : 'Không còn ai phát ra tiếng'} từ ${clock(a.since)} (khoảng ${mins} phút), có vẻ lớp đã tan. Bạn muốn dừng ghi hay chờ tiếp?` +
+    (a.autoEndAt ? ` Nếu bạn không chọn, bot tự dừng và xuất file lúc ${clock(a.autoEndAt)}.` : '');
+  const key = `${d.id}|${a.reason}|${a.since}`;
+  if (key !== lastAttnKey) {
+    lastAttnKey = key;
+    switchTab('record');
+    // Thông báo trên màn hình máy tính, phòng khi bạn đang ở cửa sổ khác.
+    if ('Notification' in window && Notification.permission === 'granted') {
+      try {
+        const n = new Notification('Class Recorder: ' + title, { body: `Buổi "${d.title}": dừng ghi hay chờ tiếp? Mở Class Recorder để chọn.`, tag: 'classrec-attn', requireInteraction: true });
+        n.onclick = () => { window.focus(); n.close(); };
+      } catch (e) { /* trình duyệt không cho hiện thông báo */ }
+    }
+  }
+}
+function askNotifyPermission() {
+  if ('Notification' in window && Notification.permission === 'default') Notification.requestPermission().catch(() => {});
+}
+$('#btn-attn-stop').onclick = async () => {
+  try {
+    await api('/api/stop', { id: viewId });
+    toast('Đã gửi lệnh dừng. Bot đang xuất file.');
+  } catch (e) {
+    fail(e);
+  }
+};
+$('#btn-attn-keep').onclick = async () => {
+  try {
+    await api('/api/keep', { id: viewId });
+    $('#l-attn').hidden = true;
+    toast('Bot sẽ chờ thêm rồi hỏi lại nếu vẫn không có ai.');
+  } catch (e) {
+    fail(e);
+  }
+};
+
+/* Khi đang ghi: dải nút chọn lớp để xem/điều khiển, và nút ghi thêm lớp nếu còn chỗ. */
+function renderRunTabs(all, canAdd) {
+  const box = $('#run-tabs');
+  box.hidden = !(all.length > 1 || canAdd);
+  if (box.hidden) return;
+  const sig = JSON.stringify([all.map((s) => [s.id, s.title, s.phase]), canAdd, viewId]);
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
+  box.innerHTML = all.map((s) => `<button class="btn small ${s.id === viewId ? 'primary' : ''}" data-view="${esc(s.id)}">${esc(s.title)} · ${esc(PHASE[s.phase] || s.phase)}</button>`).join('') + (canAdd ? `<button class="btn small ${viewId === 'new' ? 'primary' : ''}" data-view="new">+ Ghi thêm một lớp</button>` : '');
+  for (const b of box.querySelectorAll('button')) {
+    b.onclick = () => {
+      viewId = b.dataset.view;
+      lastShotShown = null;
+      tickNow();
+    };
+  }
+}
+
+function renderLast() {
+  const box = $('#last-card');
+  const s = (state.runningAll || []).length ? null : state.sessions[0];
+  if (!s) return void (box.hidden = true);
+  box.hidden = false;
+  const sig = JSON.stringify([s.id, s.phase, s.files, s.notes]);
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
+  box.innerHTML = `
+    <div class="head"><h2>Buổi gần nhất: ${esc(s.title)}</h2><span class="pill ${pillClass(s.phase)}">${esc(PHASE[s.phase] || s.phase)}</span></div>
+    <p class="muted" style="margin: 0 0 14px">${esc(fmtDate(s.startedAt))}${s.durationSeconds ? ' · ' + esc(fmtDur(s.durationSeconds)) : ''}${s.message ? ' · ' + esc(s.message) : ''}</p>
+    <button class="btn" id="btn-open-last">Xem video và tóm tắt</button>`;
+  $('#btn-open-last').onclick = () => {
+    selectSession(s.id);
+    switchTab('sessions');
+  };
+}
+
+$('#btn-start').onclick = async () => {
+  const btn = $('#btn-start');
+  btn.disabled = true;
+  askNotifyPermission(); // để app báo được trên màn hình khi bot cần bạn quyết định
+  try {
+    const started = await api('/api/start', { url: $('#f-url').value, title: $('#f-title').value, passcode: $('#f-pass').value, summary: $('#f-summary').checked });
+    toast('Đã bắt đầu. Bot đang mở trình duyệt.');
+    $('#f-url').value = '';
+    $('#f-pass').value = '';
+    lastShotShown = null;
+    // Chờ tiến trình ghi tạo xong trạng thái rồi mới làm mới giao diện.
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 400));
+      const st = await api('/api/state');
+      if ((st.runningAll || []).some((s) => s.id === started.id)) break;
+    }
+    viewId = started.id;
+    tickNow();
+  } catch (e) {
+    fail(e);
+  }
+  btn.disabled = false;
+};
+$('#btn-rejoin').onclick = async () => {
+  try {
+    await api('/api/rejoin', { url: $('#r-url').value, id: viewId });
+    $('#r-url').value = '';
+    toast('Đã gửi lệnh đổi phòng. Bot sẽ chuyển trong vài giây.');
+  } catch (e) {
+    fail(e);
+  }
+};
+$('#btn-stop').onclick = async () => {
+  if (!confirm(`Dừng ghi "${state.running ? state.running.title : ''}" ngay và xuất file?`)) return;
+  try {
+    await api('/api/stop', { id: viewId });
+    toast('Đã gửi lệnh dừng. Bot đang xuất file.');
+  } catch (e) {
+    fail(e);
+  }
+};
+
+/* ───────────── Buổi đã ghi ───────────── */
+let selectedId = null;
+let detailSig = null;
+let subTab = 'summary';
+let processJob = null;
+
+function renderList() {
+  const box = $('#sess-list');
+  const sig = JSON.stringify([state.sessions.map((s) => [s.id, s.phase, s.durationSeconds, s.files.summary]), selectedId]);
+  if (box.dataset.sig === sig) return;
+  box.dataset.sig = sig;
+  if (!state.sessions.length) return void (box.innerHTML = '<p class="empty">Chưa có buổi nào được ghi.</p>');
+  box.innerHTML = state.sessions
+    .map((s) => `<button data-id="${esc(s.id)}" class="${s.id === selectedId ? 'on' : ''}">
+        <span class="t">${esc(s.title)}</span>
+        <span class="d">${esc(fmtDate(s.startedAt) || s.id)}${s.durationSeconds ? ' · ' + esc(fmtDur(s.durationSeconds)) : ''} · ${esc(s.running ? 'đang chạy' : PHASE[s.phase] || s.phase)}</span>
+      </button>`)
+    .join('');
+  $$('button', box).forEach((b) => (b.onclick = () => selectSession(b.dataset.id)));
+}
+
+function selectSession(id) {
+  selectedId = id;
+  detailSig = null;
+  subTab = 'summary';
+  if (state) renderList();
+  refreshDetail().catch(fail);
+}
+
+async function refreshDetail() {
+  if (!selectedId) return;
+  const d = await api('/api/session/' + selectedId);
+  const sig = JSON.stringify([d.id, d.phase, d.running, d.files, d.notes, d.durationSeconds, d.instructor, d.instructorAuto, d.speakers]);
+  if (sig === detailSig) {
+    if (subTab === 'log') $('#sub-body').textContent = d.log || '(trống)';
+    return;
+  }
+  detailSig = sig;
+  const box = $('#sess-detail');
+  const rec = d.files.recording;
+  box.innerHTML = `
+    <div class="head"><h2>${esc(d.title)}</h2><span class="pill ${pillClass(d.phase)}">${esc(d.running ? PHASE[d.phase] || d.phase : PHASE[d.phase] || d.phase)}</span></div>
+    <p class="muted" style="margin: 0 0 14px">${esc(fmtDate(d.startedAt))}${d.durationSeconds ? ' · ' + esc(fmtDur(d.durationSeconds)) : ''}${d.platform ? ' · ' + esc(PLATFORM[d.platform] || d.platform) : ''}${d.message && !d.running ? ' · ' + esc(d.message) : ''}</p>
+    ${instructorHtml(d)}
+    ${d.notes.map((n) => `<p class="note warn">${esc(n)}</p>`).join('')}
+    ${rec ? `<video id="player" controls preload="metadata" src="/files/${esc(d.id)}/${esc(rec)}"></video>` : d.running ? '<p class="note info">Buổi này đang chạy. Video xuất hiện ở đây khi buổi ghi kết thúc.</p>' : d.videoRemoved ? `<p class="note info">Video đã được tự dọn ngày ${esc(fmtDate(d.videoRemoved))} để tiết kiệm dung lượng; phiên âm và tóm tắt vẫn còn.</p>` : '<p class="note warn">Buổi này không có video.</p>'}
+    <div class="subtabs">
+      <button data-sub="summary">Tóm tắt</button><button data-sub="transcript">Phiên âm</button><button data-sub="log">Nhật ký</button>
+    </div>
+    <div id="sub-body"></div>
+    <hr>
+    <div class="actions">
+      <button class="btn" id="btn-process" ${d.running ? 'disabled' : ''}>Phiên âm và tóm tắt lại</button>
+      ${state.server && state.server.canOpenFolder ? '<button class="btn" id="btn-folder">Mở thư mục chứa file</button>' : ''}
+      ${rec ? `<a class="btn" href="/files/${esc(d.id)}/${esc(rec)}" download="${esc(d.id)}-${esc(rec)}">Tải video</a>` : ''}
+      ${d.files.summary ? `<a class="btn" href="/files/${esc(d.id)}/${esc(d.files.summary)}" download="${esc(d.id)}-tom-tat.md">Tải tóm tắt</a>` : ''}
+      ${d.files.transcript ? `<a class="btn" href="/files/${esc(d.id)}/${esc(d.files.transcript)}" download="${esc(d.id)}-phien-am.txt">Tải phiên âm</a>` : ''}
+      ${d.running ? '' : '<button class="btn danger" id="btn-delete">Xoá buổi này</button>'}
+    </div>
+    <pre id="process-out" class="log" hidden></pre>`;
+  $$('.subtabs button', box).forEach((b) => (b.onclick = () => showSub(b.dataset.sub, d)));
+  if ($('#btn-instr')) $('#btn-instr').onclick = async () => {
+    const name = prompt('Tên giảng viên của buổi này (để trống để xoá):', d.instructor || '');
+    if (name === null) return;
+    try {
+      await api('/api/session-meta', { id: d.id, instructor: name });
+      detailSig = null;
+      await refreshDetail();
+      toast('Đã lưu tên giảng viên. Bấm "Phiên âm và tóm tắt lại" nếu muốn bản tóm tắt dùng tên mới.');
+    } catch (e) {
+      fail(e);
+    }
+  };
+  if ($('#btn-folder')) $('#btn-folder').onclick = () => api('/api/open-folder', { id: d.id }).catch(fail);
+  $('#btn-process').onclick = () => runProcess(d.id);
+  if ($('#btn-delete')) $('#btn-delete').onclick = async () => {
+    if (!confirm(`Xoá hẳn buổi "${d.title}"?\nVideo, bản phiên âm và bản tóm tắt của buổi này sẽ mất, không khôi phục được.`)) return;
+    try {
+      await api('/api/delete-session', { id: d.id });
+      toast('Đã xoá buổi ghi.');
+      selectedId = null;
+      detailSig = null;
+      $('#sess-detail').innerHTML = '<p class="empty">Chọn một buổi ở danh sách bên trái.</p>';
+      state = await api('/api/state');
+      renderList();
+      renderLast();
+    } catch (e) {
+      fail(e);
+    }
+  };
+  if (pendingSeek && pendingSeek.id === d.id && $('#player')) {
+    // Mở từ trích dẫn hỏi đáp: tua tới đúng mốc khi video sẵn sàng.
+    const t = pendingSeek.t;
+    const v = $('#player');
+    const go = () => { v.currentTime = t; v.scrollIntoView({ behavior: 'smooth', block: 'center' }); };
+    if (v.readyState >= 1) go(); else v.addEventListener('loadedmetadata', go, { once: true });
+  }
+  pendingSeek = null;
+  if (!d.files.summary && subTab === 'summary') subTab = d.files.transcript ? 'transcript' : 'log';
+  showSub(subTab, d);
+}
+
+async function showSub(name, d) {
+  subTab = name;
+  $$('.subtabs button').forEach((b) => b.classList.toggle('on', b.dataset.sub === name));
+  const body = $('#sub-body');
+  body.className = '';
+  if (name === 'log') {
+    body.className = 'log';
+    body.style.whiteSpace = 'pre-wrap';
+    body.textContent = d.log || '(trống)';
+    return;
+  }
+  body.style.whiteSpace = '';
+  const file = name === 'summary' ? d.files.summary : d.files.transcript;
+  if (!file) {
+    body.innerHTML = `<p class="muted">${name === 'summary' ? 'Buổi này chưa có bản tóm tắt.' : 'Buổi này chưa có bản phiên âm.'} Kiểm tra API key ở tab Cài đặt rồi bấm "Phiên âm và tóm tắt lại".</p>`;
+    return;
+  }
+  try {
+    const text = (await (await fetch(`/files/${d.id}/${file}`)).text()).replace(/^﻿/, '');
+    body.className = 'doc';
+    body.innerHTML = name === 'summary' ? markdown(text) : text.split(/\n\s*\n/).filter((p) => p.trim()).map((p) => `<p>${linkTimes(esc(p.trim()))}</p>`).join('');
+  } catch (e) {
+    body.innerHTML = `<p class="note err">Không đọc được file: ${esc(e.message)}</p>`;
+  }
+}
+
+// Bấm vào mốc thời gian [hh:mm:ss] trong tóm tắt/phiên âm để tua video tới đó.
+/* Giảng viên của buổi: bot đoán theo người nói lâu nhất, người dùng sửa được. */
+function instructorHtml(d) {
+  if (d.running) return '';
+  const top = d.speakers ? Object.entries(d.speakers).slice(0, 5).map(([n, sec]) => `${esc(n)} ${fmtDur(sec)}`).join(' · ') : '';
+  const who = d.instructor
+    ? `<strong>Giảng viên: ${esc(d.instructor)}</strong>${d.instructorAuto ? ' <span class="muted">(bot đoán theo người nói nhiều nhất)</span>' : ''}`
+    : `<span class="muted">${d.speakers ? 'Chưa đủ dữ liệu để đoán giảng viên.' : 'Chưa có tên giảng viên.'}</span>`;
+  return `<div class="head" style="margin:-4px 0 12px"><div>${who}${top ? `<div class="help">Thời gian nói: ${top}</div>` : ''}</div><button class="btn small" id="btn-instr">${d.instructor ? 'Sửa' : 'Đặt tên'}</button></div>`;
+}
+
+/* ───────────── Hỏi đáp về các buổi học ───────────── */
+let pendingSeek = null; // { id, t } — tua tới đâu sau khi mở buổi từ trích dẫn
+let askLabels = {};
+// Trích dẫn [B2 00:12:30] hoặc [B2] → liên kết mở buổi tương ứng (và tua tới mốc thời gian nếu có).
+const linkCites = (html) =>
+  html.replace(/\[(B\d+)(?:\s*[·,\-–]?\s*(\d{1,2}):(\d{2}):(\d{2}))?\]/g, (m, code, h, mi, s) => {
+    const id = askLabels[code];
+    if (!id) return m;
+    const t = h ? +h * 3600 + +mi * 60 + +s : '';
+    return `<a href="#" class="ts" data-sid="${esc(id)}" data-st="${t}">${m}</a>`;
+  });
+$('#btn-ask').onclick = async () => {
+  const q = $('#ask-q').value.trim();
+  if (!q) return;
+  const btn = $('#btn-ask');
+  const out = $('#ask-out');
+  btn.disabled = true;
+  out.hidden = false;
+  out.innerHTML = '<p class="muted">Đang tìm trong các buổi đã ghi…</p>';
+  try {
+    const r = await api('/api/ask', { question: q });
+    askLabels = r.labels || {};
+    const legend = Object.entries(askLabels).slice(0, 12).map(([code, id]) => {
+      const s = r.sessions.find((x) => x.id === id);
+      return `${code}: ${esc(s ? s.title : id)}`;
+    }).join(' · ');
+    out.innerHTML = linkCites(markdown(r.answer)) + `<p class="help" style="margin-top:12px">${legend}</p>`;
+  } catch (e) {
+    out.innerHTML = `<p class="note err">${esc(e.message)}</p>`;
+  }
+  btn.disabled = false;
+};
+/* Tìm kiếm toàn văn (miễn phí, chạy trên máy chủ). */
+$('#btn-search').onclick = async () => {
+  const q = $('#search-q').value.trim();
+  const out = $('#search-out');
+  if (!q) return void (out.hidden = true);
+  out.hidden = false;
+  out.innerHTML = '<p class="muted">Đang tìm…</p>';
+  try {
+    const r = await api('/api/search', { q });
+    if (!r.results.length) return void (out.innerHTML = `<p class="muted">Không thấy "${esc(r.query)}" trong buổi nào.</p>`);
+    out.innerHTML = `<p class="muted" style="margin:0 0 8px">${r.total} kết quả trong ${r.results.length} buổi</p>` + r.results.map((s) => `
+      <div style="border-top:1px solid var(--border);padding:10px 0">
+        <a href="#" class="ts" data-sid="${esc(s.id)}" data-st="">${esc(s.title)}</a> <span class="muted" style="font-size:.85rem">${esc(fmtDate(s.startedAt))}</span>
+        ${s.hits.map((h) => `<div style="margin-top:6px;font-size:.93rem;overflow-wrap:anywhere">
+          ${h.t !== null ? `<a href="#" class="ts" data-sid="${esc(s.id)}" data-st="${h.t}">[${fmtClock(h.t)}]</a> ` : `<span class="muted">${h.source === 'summary' ? '[tóm tắt]' : ''}</span> `}${esc(h.before)}<mark>${esc(h.match)}</mark>${esc(h.after)}</div>`).join('')}
+      </div>`).join('');
+  } catch (e) {
+    out.innerHTML = `<p class="note err">${esc(e.message)}</p>`;
+  }
+};
+$('#search-q').onkeydown = (e) => { if (e.key === 'Enter') $('#btn-search').click(); };
+const fmtClock = (t) => [Math.floor(t / 3600), Math.floor((t % 3600) / 60), t % 60].map((n) => String(n).padStart(2, '0')).join(':');
+
+$('#ask-q').onkeydown = (e) => { if (e.key === 'Enter') $('#btn-ask').click(); };
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a[data-sid]');
+  if (!a) return;
+  e.preventDefault();
+  pendingSeek = a.dataset.st ? { id: a.dataset.sid, t: Number(a.dataset.st) } : null;
+  selectSession(a.dataset.sid);
+});
+
+const linkTimes = (html) => html.replace(/\[(\d{1,2}):(\d{2}):(\d{2})\]/g, (m, h, mi, s) => `<a href="#" class="ts" data-t="${+h * 3600 + +mi * 60 + +s}">${m}</a>`);
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('a.ts[data-t]');
+  if (!a) return;
+  e.preventDefault();
+  const v = $('#player');
+  if (!v) return;
+  v.currentTime = Number(a.dataset.t);
+  v.play().catch(() => {});
+  v.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+
+function markdown(src) {
+  const inline = (s) => linkTimes(esc(s)).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/(^|[^*])\*([^*\s][^*]*)\*/g, '$1<em>$2</em>').replace(/`([^`]+)`/g, '<code>$1</code>');
+  const out = [];
+  let list = null, para = [];
+  const flush = () => {
+    if (para.length) out.push(`<p>${inline(para.join(' '))}</p>`);
+    para = [];
+    if (list) out.push(`</${list}>`);
+    list = null;
+  };
+  for (const raw of src.split(/\r?\n/)) {
+    const line = raw.trimEnd();
+    let m;
+    if (!line.trim()) flush();
+    else if ((m = /^(#{1,4})\s+(.*)$/.exec(line))) { flush(); out.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); }
+    else if (/^\s*(---+|\*\*\*+)\s*$/.test(line)) { flush(); out.push('<hr>'); }
+    else if ((m = /^\s*>\s?(.*)$/.exec(line))) { flush(); out.push(`<blockquote>${inline(m[1])}</blockquote>`); }
+    else if ((m = /^\s*([-*+]|\d+[.)])\s+(.*)$/.exec(line))) {
+      const kind = /\d/.test(m[1]) ? 'ol' : 'ul';
+      if (para.length) { out.push(`<p>${inline(para.join(' '))}</p>`); para = []; }
+      if (list !== kind) { if (list) out.push(`</${list}>`); out.push(`<${kind}>`); list = kind; }
+      out.push(`<li>${inline(m[2])}</li>`);
+    } else {
+      if (list) { out.push(`</${list}>`); list = null; }
+      para.push(line.trim());
+    }
+  }
+  flush();
+  return out.join('\n');
+}
+
+async function watchJob(jobId, pre, onDone) {
+  pre.hidden = false;
+  for (;;) {
+    let job;
+    try {
+      job = await api('/api/job/' + jobId);
+    } catch (e) {
+      pre.textContent += `\n${e.message}`;
+      return;
+    }
+    pre.textContent = job.output || 'Đang chạy…';
+    pre.scrollTop = pre.scrollHeight;
+    if (job.done) return void onDone(job);
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+}
+
+async function runProcess(id) {
+  const btn = $('#btn-process');
+  btn.disabled = true;
+  try {
+    const { job } = await api('/api/process', { id });
+    await watchJob(job, $('#process-out'), (j) => {
+      toast(j.code === 0 ? 'Đã xử lý xong.' : 'Xử lý lại gặp lỗi. Xem chi tiết bên dưới.', j.code !== 0);
+      detailSig = null;
+      const keep = $('#process-out').textContent;
+      refreshDetail().then(() => {
+        const pre = $('#process-out');
+        if (pre && j.code !== 0) { pre.hidden = false; pre.textContent = keep; }
+      });
+    });
+  } catch (e) {
+    fail(e);
+    btn.disabled = false;
+  }
+}
+
+/* ───────────── Cài đặt ───────────── */
+let settingsLoaded = false;
+const PRESETS = [
+  ['Fish Audio', 'https://api.fish.audio/v1', 'transcribe-1-pro'],
+  ['Groq (có gói miễn phí)', 'https://api.groq.com/openai/v1', 'whisper-large-v3'],
+  ['OpenAI', 'https://api.openai.com/v1', 'whisper-1'],
+];
+
+function fieldHtml(f) {
+  const id = `s-${f.key}`;
+  const help = f.help ? `<span class="help">${esc(f.help)}</span>` : '';
+  if (f.type === 'bool') return `<label class="check"><input type="checkbox" id="${id}" ${f.value === 'true' ? 'checked' : ''}> <span>${esc(f.label)}${help}</span></label>`;
+  if (f.type === 'select') return `<label>${esc(f.label)}<select id="${id}">${f.options.map(([v, t]) => `<option value="${esc(v)}" ${v === f.value ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>${help}</label>`;
+  if (f.type === 'secret') {
+    return `<label>${esc(f.label)} <span class="pill plain ${f.isSet ? 'ok' : 'warn'}" style="font-size:.8rem">${f.isSet ? 'Đã lưu, kết thúc bằng …' + esc(f.hint) : 'Chưa đặt'}</span>
+      <span class="secret"><input type="password" id="${id}" autocomplete="new-password" placeholder="${f.isSet ? 'Để trống nếu không đổi' : 'Dán API key vào đây'}">${f.isSet ? `<button type="button" class="btn small" data-clear="${esc(f.key)}">Xoá key</button>` : ''}</span>${help}</label>`;
+  }
+  return `<label>${esc(f.label)}<input type="${f.type === 'number' ? 'number' : 'text'}" id="${id}" value="${esc(f.value)}" ${f.type === 'number' ? 'step="any"' : ''} ${f.min !== null ? `min="${f.min}"` : ''} ${f.max !== null ? `max="${f.max}"` : ''}>${help}</label>`;
+}
+
+let settingsFields = [];
+const cleared = new Set();
+async function loadSettings() {
+  const { groups } = await api('/api/settings');
+  settingsFields = groups.flatMap((g) => g.fields);
+  cleared.clear();
+  $('#settings-groups').innerHTML = groups
+    .map((g) => {
+      const bools = g.fields.filter((f) => f.type === 'bool');
+      const others = g.fields.filter((f) => f.type !== 'bool');
+      const presets = g.id === 'stt' ? `<div class="presets"><span class="muted">Dịch vụ chính:</span>${PRESETS.map((p, i) => `<button type="button" class="btn small" data-preset="${i}">${esc(p[0])}</button>`).join('')}<span class="muted" style="margin-left:10px">Dự phòng:</span><button type="button" class="btn small" id="preset-backup-groq">Groq làm dự phòng</button></div>` : '';
+      return `<div class="card"><h2>${esc(g.title)}</h2>${presets}<div class="row">${others.map(fieldHtml).join('')}</div>${bools.map(fieldHtml).join('')}</div>`;
+    })
+    .join('');
+  $$('[data-preset]').forEach((b) => (b.onclick = () => {
+    const p = PRESETS[b.dataset.preset];
+    $('#s-STT_BASE_URL').value = p[1];
+    $('#s-STT_MODEL').value = p[2];
+    markDirty();
+    toast(`Đã điền địa chỉ và model của ${p[0]}. Nhớ dán API key của dịch vụ này rồi bấm Lưu.`);
+  }));
+  if ($('#preset-backup-groq')) $('#preset-backup-groq').onclick = () => {
+    $('#s-STT_BACKUP_BASE_URL').value = 'https://api.groq.com/openai/v1';
+    $('#s-STT_BACKUP_MODEL').value = 'whisper-large-v3';
+    markDirty();
+    toast('Đã điền Groq làm dịch vụ dự phòng. Dán API key Groq vào ô "Dịch vụ dự phòng: API key" rồi bấm Lưu.');
+  };
+  $$('[data-clear]').forEach((b) => (b.onclick = () => {
+    cleared.add(b.dataset.clear);
+    b.textContent = 'Sẽ xoá khi lưu';
+    b.disabled = true;
+    markDirty();
+  }));
+  $$('#settings-groups input, #settings-groups select').forEach((el) => (el.oninput = markDirty));
+  $('#save-state').textContent = 'Cài đặt áp dụng từ buổi ghi tiếp theo.';
+  settingsLoaded = true;
+}
+function markDirty() {
+  $('#save-state').textContent = 'Có thay đổi chưa lưu.';
+}
+
+$('#btn-save').onclick = async () => {
+  const values = {};
+  for (const f of settingsFields) {
+    const el = $(`#s-${f.key}`);
+    if (!el) continue;
+    if (f.type === 'bool') values[f.key] = el.checked ? 'true' : 'false';
+    else if (f.type === 'secret') values[f.key] = cleared.has(f.key) && !el.value ? '__clear__' : el.value;
+    else values[f.key] = el.value;
+  }
+  try {
+    await api('/api/settings', { values });
+    await loadSettings();
+    toast('Đã lưu cài đặt.');
+    state = await api('/api/state');
+    renderKeyWarn();
+  } catch (e) {
+    fail(e);
+  }
+};
+
+/* Đăng nhập cho bot trên máy chủ không có màn hình: hiện trình duyệt của bot ngay trong trang (noVNC qua /vnc/). */
+const VNC_URL = '/vnc/vnc.html?autoconnect=1&resize=scale&reconnect=1&path=vnc/websockify';
+async function remoteLoginFlow() {
+  const out = $('#tool-out');
+  const panel = $('#vnc-panel');
+  const { job } = await api('/api/tool', { name: 'login' });
+  out.hidden = false;
+  out.textContent = 'Đang mở trình duyệt của bot trên máy chủ…';
+  let opened = false;
+  for (;;) {
+    const j = await api('/api/job/' + job);
+    if (j.output) out.textContent = j.output;
+    if (j.done) {
+      panel.hidden = true;
+      $('#vnc-frame').removeAttribute('src');
+      toast(j.code === 0 ? 'Đã lưu phiên đăng nhập cho bot.' : 'Đăng nhập từ xa gặp lỗi, xem chi tiết bên dưới.', j.code !== 0);
+      return;
+    }
+    if (!opened) {
+      const st = await api('/api/state');
+      if (st.server.remoteLoginActive) {
+        opened = true;
+        panel.hidden = false;
+        $('#vnc-frame').src = VNC_URL;
+        $('#vnc-newtab').href = VNC_URL;
+        panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+}
+$('#btn-pw').onclick = async () => {
+  try {
+    await api('/api/change-password', { current: $('#pw-current').value, next: $('#pw-next').value });
+    $('#pw-current').value = '';
+    $('#pw-next').value = '';
+    toast('Đã đổi mật khẩu.');
+  } catch (e) {
+    fail(e);
+  }
+};
+$('#btn-vnc-done').onclick = () => api('/api/login-stop', {}).catch(fail);
+
+$$('[data-tool]').forEach((b) => (b.onclick = async () => {
+  $$('[data-tool]').forEach((x) => (x.disabled = true));
+  if (b.dataset.tool === 'login' && state && state.server && state.server.remoteLogin) {
+    try {
+      await remoteLoginFlow();
+    } catch (e) {
+      fail(e);
+    }
+    $$('[data-tool]').forEach((x) => (x.disabled = false));
+    return;
+  }
+  try {
+    const { job } = await api('/api/tool', { name: b.dataset.tool });
+    await watchJob(job, $('#tool-out'), (j) => toast(j.code === 0 ? `${j.label}: xong.` : `${j.label}: có lỗi, xem chi tiết bên dưới.`, j.code !== 0));
+  } catch (e) {
+    fail(e);
+  }
+  $$('[data-tool]').forEach((x) => (x.disabled = false));
+}));
+
+tick();
+loadSchedules().catch(() => {});
+setInterval(() => loadSchedules().catch(() => {}), 60000);
+</script>
+</body>
+</html>

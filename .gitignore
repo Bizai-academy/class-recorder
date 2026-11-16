@@ -1,0 +1,10 @@
+node_modules/
+data/
+.env
+stt-local/.venv/
+__pycache__/
+class-recorder-vps.tar.gz
+CLAUDE.local.md
+src/remote-login.js
+dist/
+runtime/

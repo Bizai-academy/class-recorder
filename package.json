@@ -1,0 +1,22 @@
+{
+  "name": "class-recorder",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bot tự vào lớp học online (Zoom / Google Meet), ghi hình, hỗ trợ rejoin và tạo file tóm tắt.",
+  "type": "module",
+  "bin": {
+    "classrec": "src/cli.js"
+  },
+  "scripts": {
+    "selftest": "node src/cli.js selftest"
+  },
+  "engines": {
+    "node": ">=20.12"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.8.0",
+    "ffmpeg-static": "^5.3.0",
+    "node-ical": "^0.27.6",
+    "playwright": "^1.65.0"
+  }
+}
