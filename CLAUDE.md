@@ -6,7 +6,6 @@ Luôn trả lời bằng tiếng Việt. Bot tự vào lớp Zoom/Google Meet, g
 - **Không** giúp bot vượt qua cơ chế chặn bot của Zoom/Meet (giả làm người, che dấu tự động hoá...). Phòng báo "Automated bots aren't allowed" → bot dừng, báo người dùng xin bản ghi hoặc xin phép người tổ chức.
 - `src/remote-login.js` (đăng nhập từ xa) **chưa từng chạy thử**, chỉ để trên máy: **không vào git, không đưa lên VPS, không đóng gói**.
 - Không ghi API key, mật khẩu vào chat hay vào git. Key nằm trong `.env` (đã gitignore).
-- Mausbot đi chợ hộ: phải hỏi chủ trước khi đặt hàng/thanh toán; không đưa số thẻ cho bot.
 
 ## Nơi chạy
 - **Máy cá nhân (Windows):** thư mục này, git nhánh `main`. Mở giao diện: `Class Recorder.bat`.
