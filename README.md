@@ -8,12 +8,6 @@ Runs on a Windows PC or on a Linux VPS, with a web dashboard — no command line
 
 > **Languages:** the dashboard, notifications and logs are available in **English and Vietnamese** — use the language button in the top bar. Summaries follow the interface language unless you set *Summary language* in Settings. Transcription follows whatever language is spoken.
 
-## Responsible use
-
-- **Tell your instructor or organizer** that you are recording. The bot appears in the room as a normal participant under the name set in `BOT_NAME`, with its microphone muted and a black camera.
-- Recording laws and platform terms differ by country and organization. **You are responsible for getting permission** to record.
-- If a meeting blocks automated participants (Zoom: *"Automated bots aren't allowed to join this meeting"*), the bot **stops and tells you**. It does not try to get around it — ask the organizer for their recording or for permission instead.
-
 ## Features
 
 - **Hands-free recording** — waits for the room to open, joins, records, and stops when the class ends.

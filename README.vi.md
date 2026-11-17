@@ -4,12 +4,6 @@
 
 Bot tự vào lớp học trên **Zoom** hoặc **Google Meet** bằng trình duyệt, ghi lại hình + tiếng từ lúc phòng mở đến lúc phòng đóng, hỗ trợ **rejoin** khi lớp đổi sang link khác, rồi tạo **bản phiên âm** và **file tóm tắt**. Chạy được trên máy cá nhân (Windows) và trên VPS Linux — do người hoặc do một agent như Mausbot điều khiển qua dòng lệnh.
 
-## Sử dụng có trách nhiệm
-
-- **Hãy báo với giảng viên/đơn vị tổ chức** rằng bạn dùng bot ghi hình. Bot xuất hiện trong phòng như một người tham dự với tên đặt ở `BOT_NAME`; mic luôn tắt, camera là hình đen.
-- Quy định về ghi hình khác nhau tuỳ nơi và tuỳ đơn vị. **Bạn tự chịu trách nhiệm xin phép** trước khi ghi.
-- Phòng chặn người tham dự tự động (Zoom báo *"Automated bots aren't allowed to join this meeting"*) thì bot **dừng lại và báo cho bạn**, không tìm cách vượt qua. Khi đó hãy xin bản ghi hoặc xin phép người tổ chức.
-
 ## Cách hoạt động
 
 ```
