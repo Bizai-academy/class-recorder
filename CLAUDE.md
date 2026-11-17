@@ -1,6 +1,6 @@
 # Class Recorder — ghi chú cho trợ lý AI
 
-Luôn trả lời bằng tiếng Việt. Bot tự vào lớp Zoom/Google Meet, ghi hình + tiếng, phiên âm, tóm tắt; có giao diện web. Chi tiết tính năng: `README.md`. Điều khiển bằng dòng lệnh: `AGENT.md`. Cài VPS: `HUONG-DAN-VPS.md`.
+Luôn trả lời bằng tiếng Việt. Bot tự vào lớp Zoom/Google Meet, ghi hình + tiếng, phiên âm, tóm tắt; có giao diện web. Chi tiết tính năng: `README.vi.md` (bản tiếng Anh: `README.md`, sửa tính năng thì cập nhật cả hai). Điều khiển bằng dòng lệnh: `AGENT.md`. Cài VPS: `HUONG-DAN-VPS.md`.
 
 ## Ranh giới bắt buộc
 - **Không** giúp bot vượt qua cơ chế chặn bot của Zoom/Meet (giả làm người, che dấu tự động hoá...). Phòng báo "Automated bots aren't allowed" → bot dừng, báo người dùng xin bản ghi hoặc xin phép người tổ chức.
