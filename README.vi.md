@@ -174,15 +174,20 @@ node scripts/deploy.mjs
 
 Lệnh tự kiểm tra VPS không đang ghi, đóng gói (không kèm `.env`, dữ liệu, thư viện), chép lên, cài thư viện, chạy tự kiểm thử trên VPS, rồi mới khởi động lại giao diện. Tự kiểm thử có mục chưa đạt thì dừng, không khởi động lại. Thêm `--skip-selftest` để bỏ qua bước kiểm thử (nhanh hơn khoảng 4 phút).
 
-## Bản đóng gói cho Windows
+## Bản đóng gói (Windows, macOS, Linux)
 
-Tải file cài đặt ở mục [Releases](../../releases). File chưa có chữ ký số nên Windows có thể hiện cảnh báo SmartScreen: bấm **More info → Run anyway**.
+Tải gói đúng hệ điều hành ở mục [Releases](../../releases). Gói kèm sẵn Node, ffmpeg và thư viện; máy chỉ cần có **Google Chrome hoặc Microsoft Edge**. Gói chưa có chữ ký số nên lần đầu mở, hệ điều hành có thể cảnh báo.
 
-Người dùng cuối không cần cài Node hay thư viện: bản đóng gói kèm sẵn tất cả, chỉ cần máy có Chrome hoặc Edge.
+| Hệ điều hành | File tải | Cách mở |
+|---|---|---|
+| **Windows** 10/11 | `ClassRecorder-Setup-<bản>.exe` (cài không cần quyền quản trị) hoặc `…-win-x64.zip` | Menu Start → **Class Recorder**. Nếu SmartScreen cảnh báo: **More info → Run anyway** |
+| **macOS** chip Apple (M1–M4) | `…-mac-arm64.zip` | Giải nén, **chuột phải vào `Class Recorder.command` → Open → Open** (chỉ lần đầu) |
+| **macOS** chip Intel | `…-mac-x64.zip` | Như trên |
+| **Linux** x64 | `…-linux-x64.tar.gz` | `tar -xzf ClassRecorder-*.tar.gz && ./ClassRecorder/class-recorder.sh` |
 
-- **Dùng:** chạy file cài đặt `ClassRecorder-Setup-<bản>.exe` (hoặc giải nén file zip), rồi bấm đúp **Class Recorder**. Lần đầu vào tab Cài đặt để dán key phiên âm và key tóm tắt.
-- **Dựng bản mới** (trên máy phát triển): `node scripts/build.mjs` → kết quả nằm trong `dist/`. Muốn có file cài đặt thì máy cần Inno Setup 6.
-- Gỡ cài đặt chỉ xoá chương trình; thư mục `data` (video, phiên âm, tóm tắt) và file `.env` (key) được giữ lại.
+- Lần đầu vào tab Cài đặt để dán key phiên âm và key tóm tắt. Đổi ngôn ngữ giao diện (Việt/Anh) bằng nút trên thanh trên cùng.
+- **Dựng bản mới:** `node scripts/build.mjs` dựng gói cho hệ điều hành đang chạy lệnh (Windows có thêm file cài đặt nếu máy có Inno Setup 6). Muốn có cả ba hệ cùng lúc: đẩy một tag dạng `v1.2.0` lên GitHub, quy trình `.github/workflows/release.yml` tự dựng trên máy Windows, Mac, Linux của GitHub và đính vào bản phát hành.
+- Gỡ cài đặt (Windows) chỉ xoá chương trình; thư mục `data` (video, phiên âm, tóm tắt) và file `.env` (key) được giữ lại.
 
 ## Đóng góp
 

@@ -6,7 +6,7 @@ A bot that joins your online class on **Zoom** or **Google Meet** through a brow
 
 Runs on a Windows PC or on a Linux VPS, with a web dashboard — no command line needed for day-to-day use.
 
-> **Language note:** the dashboard and generated summaries are currently in **Vietnamese** by default. Transcription follows whatever language is spoken (Whisper detects it); set `SUMMARY_LANGUAGE=English` for English summaries. An English dashboard is planned.
+> **Languages:** the dashboard, notifications and logs are available in **English and Vietnamese** — use the language button in the top bar. Summaries follow the interface language unless you set *Summary language* in Settings. Transcription follows whatever language is spoken.
 
 ## Responsible use
 
@@ -29,11 +29,16 @@ Runs on a Windows PC or on a Linux VPS, with a web dashboard — no command line
 
 ## Install
 
-### Windows (easiest)
+Download the package for your system from [Releases](../../releases). Node.js, ffmpeg and all libraries are bundled; you only need **Google Chrome or Microsoft Edge** installed. The packages are not code-signed yet, so your system may warn you the first time.
 
-Download `ClassRecorder-Setup-<version>.exe` from [Releases](../../releases) and run it — no admin rights needed. Node.js and all libraries are bundled; you only need **Chrome or Edge**.
+| System | Download | Start |
+|---|---|---|
+| **Windows** 10/11 | `ClassRecorder-Setup-<version>.exe` (installer, no admin rights) or `…-win-x64.zip` | Start menu → **Class Recorder**. SmartScreen warning: **More info → Run anyway** |
+| **macOS** Apple Silicon (M1–M4) | `…-mac-arm64.zip` | Unzip, then **right-click `Class Recorder.command` → Open → Open** (first time only) |
+| **macOS** Intel | `…-mac-x64.zip` | Same as above |
+| **Linux** x64 | `…-linux-x64.tar.gz` | `tar -xzf ClassRecorder-*.tar.gz && ./ClassRecorder/class-recorder.sh` |
 
-The installer is not code-signed yet, so Windows SmartScreen may warn you: click **More info → Run anyway**.
+The dashboard opens at `http://127.0.0.1:8787`. Your recordings and keys stay in the app folder (`data/`, `.env`).
 
 ### From source
 
