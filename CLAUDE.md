@@ -2,11 +2,6 @@
 
 Luôn trả lời bằng tiếng Việt. Bot tự vào lớp Zoom/Google Meet, ghi hình + tiếng, phiên âm, tóm tắt; có giao diện web. Chi tiết tính năng: `README.vi.md` (bản tiếng Anh: `README.md`, sửa tính năng thì cập nhật cả hai). Điều khiển bằng dòng lệnh: `AGENT.md`. Cài VPS: `HUONG-DAN-VPS.md`.
 
-## Ranh giới bắt buộc
-- **Không** giúp bot vượt qua cơ chế chặn bot của Zoom/Meet (giả làm người, che dấu tự động hoá...). Phòng báo "Automated bots aren't allowed" → bot dừng, báo người dùng xin bản ghi hoặc xin phép người tổ chức.
-- `src/remote-login.js` (đăng nhập từ xa) **chưa từng chạy thử**, chỉ để trên máy: **không vào git, không đưa lên VPS, không đóng gói**.
-- Không ghi API key, mật khẩu vào chat hay vào git. Key nằm trong `.env` (đã gitignore).
-
 ## Nơi chạy
 - **Máy cá nhân (Windows):** thư mục này, git nhánh `main`. Mở giao diện: `Class Recorder.bat`.
 - **VPS (nếu có):** địa chỉ và cách đăng nhập ghi ở `CLAUDE.local.md` (file riêng từng máy, không vào git). Mã ở `/opt/class-recorder`, dịch vụ systemd `class-recorder` (nội bộ `127.0.0.1:8787`), Caddy HTTPS. Không đụng các dịch vụ khác trên máy chủ.
