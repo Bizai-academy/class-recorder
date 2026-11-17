@@ -83,7 +83,7 @@ Playwright drives a real Chrome window. The meeting tab is captured in-page with
 
 ## Contributing
 
-Issues and pull requests are welcome, in English or Vietnamese. Please run `node src/cli.js selftest` before submitting. Contributions that help the bot evade meeting platforms' bot restrictions will not be accepted.
+Issues and pull requests are welcome, in English or Vietnamese. Please run `node src/cli.js selftest` before submitting.
 
 ## License
 

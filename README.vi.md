@@ -185,7 +185,7 @@ Tải gói đúng hệ điều hành ở mục [Releases](../../releases). Gói 
 
 ## Đóng góp
 
-Hoan nghênh báo lỗi và pull request, bằng tiếng Việt hoặc tiếng Anh. Hãy chạy `node src/cli.js selftest` trước khi gửi. Không nhận các đóng góp giúp bot lách quy định chặn bot của nền tảng họp.
+Hoan nghênh báo lỗi và pull request, bằng tiếng Việt hoặc tiếng Anh. Hãy chạy `node src/cli.js selftest` trước khi gửi.
 
 ## Giấy phép
 
