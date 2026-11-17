@@ -854,15 +854,8 @@ async function refreshDetail() {
   box.innerHTML = `
     <div class="head"><h2>${esc(d.title)}</h2><span class="pill ${pillClass(d.phase)}">${esc(d.running ? PHASE[d.phase] || d.phase : PHASE[d.phase] || d.phase)}</span></div>
     <p class="muted" style="margin: 0 0 14px">${esc(fmtDate(d.startedAt))}${d.durationSeconds ? ' · ' + esc(fmtDur(d.durationSeconds)) : ''}${d.platform ? ' · ' + esc(PLATFORM[d.platform] || d.platform) : ''}${d.message && !d.running ? ' · ' + esc(d.message) : ''}</p>
-    ${instructorHtml(d)}
-    ${d.notes.map((n) => `<p class="note warn">${esc(n)}</p>`).join('')}
-    ${rec ? `<video id="player" controls preload="metadata" src="/files/${esc(d.id)}/${esc(rec)}"></video>` : d.running ? '<p class="note info">Buổi này đang chạy. Video xuất hiện ở đây khi buổi ghi kết thúc.</p>' : d.videoRemoved ? `<p class="note info">${esc(t('Video đã được tự dọn ngày {date} để tiết kiệm dung lượng; phiên âm và tóm tắt vẫn còn.', { date: fmtDate(d.videoRemoved) }))}</p>` : '<p class="note warn">Buổi này không có video.</p>'}
-    <div class="subtabs">
-      <button data-sub="summary">Tóm tắt</button><button data-sub="transcript">Phiên âm</button><button data-sub="log">Nhật ký</button>
-    </div>
-    <div id="sub-body"></div>
-    <hr>
-    <div class="actions">
+    <!-- Hàng nút để ở trên cùng: bản phiên âm dài thì không phải kéo xuống cuối trang. -->
+    <div class="actions" style="margin: 0 0 14px">
       <button class="btn" id="btn-process" ${d.running ? 'disabled' : ''}>Phiên âm và tóm tắt lại</button>
       ${state.server && state.server.canOpenFolder ? '<button class="btn" id="btn-folder">Mở thư mục chứa file</button>' : ''}
       ${rec ? `<a class="btn" href="/files/${esc(d.id)}/${esc(rec)}" download="${esc(d.id)}-${esc(rec)}">Tải video</a>` : ''}
@@ -870,7 +863,14 @@ async function refreshDetail() {
       ${d.files.transcript ? `<a class="btn" href="/files/${esc(d.id)}/${esc(d.files.transcript)}" download="${esc(d.id)}-phien-am.txt">Tải phiên âm</a>` : ''}
       ${d.running ? '' : '<button class="btn danger" id="btn-delete">Xoá buổi này</button>'}
     </div>
-    <pre id="process-out" class="log" hidden></pre>`;
+    <pre id="process-out" class="log" hidden style="margin: 0 0 14px"></pre>
+    ${instructorHtml(d)}
+    ${d.notes.map((n) => `<p class="note warn">${esc(n)}</p>`).join('')}
+    ${rec ? `<video id="player" controls preload="metadata" src="/files/${esc(d.id)}/${esc(rec)}"></video>` : d.running ? '<p class="note info">Buổi này đang chạy. Video xuất hiện ở đây khi buổi ghi kết thúc.</p>' : d.videoRemoved ? `<p class="note info">${esc(t('Video đã được tự dọn ngày {date} để tiết kiệm dung lượng; phiên âm và tóm tắt vẫn còn.', { date: fmtDate(d.videoRemoved) }))}</p>` : '<p class="note warn">Buổi này không có video.</p>'}
+    <div class="subtabs">
+      <button data-sub="summary">Tóm tắt</button><button data-sub="transcript">Phiên âm</button><button data-sub="log">Nhật ký</button>
+    </div>
+    <div id="sub-body"></div>`;
   $$('.subtabs button', box).forEach((b) => (b.onclick = () => showSub(b.dataset.sub, d)));
   if ($('#btn-instr')) $('#btn-instr').onclick = async () => {
     const name = prompt(t('Tên giảng viên của buổi này (để trống để xoá):'), d.instructor || '');
