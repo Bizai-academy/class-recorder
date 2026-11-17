@@ -1,0 +1,77 @@
+# Dựng gói Class Recorder cho Windows, macOS và Linux trên máy của GitHub, rồi đính vào bản phát hành.
+# Builds Class Recorder for Windows, macOS and Linux on GitHub runners and attaches them to a release.
+#
+# Chạy khi đẩy một tag dạng v1.2.3 (tạo/cập nhật bản phát hành), hoặc bấm "Run workflow" ở tab Actions (chỉ dựng, không phát hành).
+name: Build and release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    # Máy Mac chip Intel của GitHub đang dần bị ngừng; nếu dựng lỗi thì vẫn phát hành các gói còn lại.
+    continue-on-error: ${{ matrix.optional }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: Windows x64, os: windows-latest, optional: false }
+          - { name: macOS Apple Silicon, os: macos-latest, optional: false }
+          - { name: macOS Intel, os: macos-15-intel, optional: true }
+          - { name: Linux x64, os: ubuntu-latest, optional: false }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install dependencies
+        run: npm ci --no-fund --no-audit
+      - name: Quick tests
+        run: node test/features-check.mjs
+      - name: Install Inno Setup (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { choco install innosetup -y --no-progress }
+      - name: Build package
+        run: node scripts/build.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: package-${{ runner.os }}-${{ runner.arch }}
+          path: |
+            dist/*.zip
+            dist/*.tar.gz
+            dist/*.exe
+          if-no-files-found: error
+
+  release:
+    name: Publish release
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          ls -la packages
+          if gh release view "$TAG" --repo "$REPO" >/dev/null 2>&1; then
+            gh release upload "$TAG" packages/* --repo "$REPO" --clobber
+          else
+            gh release create "$TAG" packages/* --repo "$REPO" --title "Class Recorder ${TAG#v}" --generate-notes
+          fi

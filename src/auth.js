@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { config } from './config.js';
+import { t, getLang } from './i18n.js';
 
 /**
  * Đăng nhập cho giao diện khi mở ra internet (VPS): một mật khẩu, lưu dạng băm scrypt trong .env (UI_PASSWORD_HASH).
@@ -78,7 +79,7 @@ export function recordLogin(ip, ok) {
 export function loginPage(message = '') {
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   return `<!doctype html>
-<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Đăng nhập — Class Recorder</title>
+<html lang="${getLang()}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${t('Đăng nhập')} — Class Recorder</title>
 <style>
   :root { --bg: #f5f6f8; --card: #fff; --text: #1b2130; --muted: #5f6b7e; --border: #dfe3ea; --accent: #2456d6; --danger: #c0271b; }
   @media (prefers-color-scheme: dark) { :root { --bg: #12151c; --card: #1b202b; --text: #e7eaf0; --muted: #9aa4b5; --border: #2d3442; --accent: #6d95f5; --danger: #ff8a7d; } }
@@ -92,8 +93,8 @@ export function loginPage(message = '') {
 </style></head>
 <body><form method="post" action="/login">
   <h1>Class Recorder</h1>
-  <label>Mật khẩu<input type="password" name="password" autofocus autocomplete="current-password" required></label>
-  <button type="submit">Đăng nhập</button>
+  <label>${t('Mật khẩu')}<input type="password" name="password" autofocus autocomplete="current-password" required></label>
+  <button type="submit">${t('Đăng nhập')}</button>
   ${message ? `<p>${esc(message)}</p>` : ''}
 </form></body></html>`;
 }

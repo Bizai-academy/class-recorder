@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import ical from 'node-ical';
 import { makeSchedule, loadSchedules, saveSchedules, dayKey } from './schedule.js';
 
@@ -30,7 +31,7 @@ export function upcomingFromIcs(icsText, { from, to, keyword = '' }) {
   for (const ev of Object.values(data)) {
     if (ev.type !== 'VEVENT' || !ev.start) continue;
     if (String(ev.status || '').toUpperCase() === 'CANCELLED') continue;
-    const title = textOf(ev.summary).trim() || 'Buổi học';
+    const title = textOf(ev.summary).trim() || t('Buổi học');
     if (kw && !title.toLowerCase().includes(kw)) continue;
     const baseLink = findLink(ev);
     const starts = [];
@@ -68,11 +69,11 @@ export function upcomingFromIcs(icsText, { from, to, keyword = '' }) {
  */
 export async function syncCalendar({ url, keyword = '', leadMin = 5, now = new Date(), icsText = null } = {}) {
   if (!icsText) {
-    if (!/^https:\/\//i.test(url || '')) throw new Error('Địa chỉ lịch phải bắt đầu bằng https://');
+    if (!/^https:\/\//i.test(url || '')) throw new Error(t('Địa chỉ lịch phải bắt đầu bằng https://'));
     const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
-    if (!res.ok) throw new Error(`Không tải được lịch (HTTP ${res.status}). Kiểm tra lại địa chỉ bí mật iCal.`);
+    if (!res.ok) throw new Error(t('Không tải được lịch (HTTP {status}). Kiểm tra lại địa chỉ bí mật iCal.', { status: res.status }));
     icsText = await res.text();
-    if (!/BEGIN:VCALENDAR/.test(icsText)) throw new Error('Địa chỉ này không trả về lịch iCal. Hãy dùng "Địa chỉ bí mật ở định dạng iCal".');
+    if (!/BEGIN:VCALENDAR/.test(icsText)) throw new Error(t('Địa chỉ này không trả về lịch iCal. Hãy dùng "Địa chỉ bí mật ở định dạng iCal".'));
   }
   const events = upcomingFromIcs(icsText, { from: now.getTime(), to: now.getTime() + 36 * 3600000, keyword });
   const list = loadSchedules();

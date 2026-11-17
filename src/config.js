@@ -83,7 +83,7 @@ export const config = {
   // Tóm tắt (Claude API)
   summaryModel: env('SUMMARY_MODEL', 'claude-opus-5-5'),
   summaryEffort: env('SUMMARY_EFFORT', 'medium'),
-  summaryLanguage: env('SUMMARY_LANGUAGE', 'tiếng Việt'),
+  summaryLanguage: env('SUMMARY_LANGUAGE', String(process.env.APP_LANG || '').toLowerCase().startsWith('en') ? 'English' : 'tiếng Việt'), // chưa đặt thì theo ngôn ngữ giao diện
   summaryContext: env('SUMMARY_CONTEXT', ''), // ghi chú cho bản tóm tắt: môn học, tên riêng, thuật ngữ hay bị phiên âm sai
   summaryFallbacks: env('SUMMARY_FALLBACKS', 'default'), // default | off
 };

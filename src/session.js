@@ -10,22 +10,23 @@ import { sessionDir, drainCommands } from './control.js';
 import { postprocess } from './post.js';
 import { notify, publicLink } from './notify.js';
 import { detectSpeakers, pickInstructor } from './speakers.js';
+import { t, getLang } from './i18n.js';
 
 const roundSpeakers = (m) => Object.fromEntries(Object.entries(m).map(([k, v]) => [k, Math.round(v)]).sort((a, b) => b[1] - a[1]));
 
 const min = (m) => m * 60000;
 
 const END_TEXT = {
-  stopped: 'Dừng theo lệnh',
-  room_closed: 'Phòng học đã đóng',
-  room_empty: 'Phòng không còn ai',
-  room_silent: 'Phòng im lặng quá lâu',
-  never_opened: 'Hết thời gian chờ mà phòng không mở',
-  needs_login: 'Phòng yêu cầu đăng nhập — chạy `classrec login` rồi thử lại',
-  bot_blocked: 'Phòng này không cho bot tự động tham gia — hãy xin bản ghi hoặc xin phép người tổ chức',
-  max_duration: 'Chạm giới hạn thời lượng tối đa',
-  browser_closed: 'Trình duyệt bị đóng',
-  error: 'Lỗi',
+  stopped: t('Dừng theo lệnh'),
+  room_closed: t('Phòng học đã đóng'),
+  room_empty: t('Phòng không còn ai'),
+  room_silent: t('Phòng im lặng quá lâu'),
+  never_opened: t('Hết thời gian chờ mà phòng không mở'),
+  needs_login: t('Phòng yêu cầu đăng nhập — chạy `classrec login` rồi thử lại'),
+  bot_blocked: t('Phòng này không cho bot tự động tham gia — hãy xin bản ghi hoặc xin phép người tổ chức'),
+  max_duration: t('Chạm giới hạn thời lượng tối đa'),
+  browser_closed: t('Trình duyệt bị đóng'),
+  error: t('Lỗi'),
 };
 
 /**
@@ -33,7 +34,7 @@ const END_TEXT = {
  * Trả về nội dung status.json cuối cùng.
  */
 export async function runSession(o) {
-  const title = o.title || 'Buổi học';
+  const title = o.title || t('Buổi học');
   const sessionId = o.sessionId || `${stamp()}-${slugify(title)}`;
   const dir = sessionDir(sessionId);
   fs.mkdirSync(path.join(dir, 'parts'), { recursive: true });
@@ -52,7 +53,7 @@ export async function runSession(o) {
     url: o.url,
     phase: 'starting',
     state: null,
-    message: 'Đang khởi động',
+    message: t('Đang khởi động'),
     startedAt: new Date().toISOString(),
     updatedAt: null,
     segments: [],
@@ -127,7 +128,7 @@ export async function runSession(o) {
     };
     const navigate = async () => {
       lastNav = Date.now();
-      await page.goto(platform.joinUrl(room.url), { waitUntil: 'domcontentloaded', timeout: 60000 }).catch((e) => log(`Không tải được trang: ${e.message.split('\n')[0]}`));
+      await page.goto(platform.joinUrl(room.url), { waitUntil: 'domcontentloaded', timeout: 60000 }).catch((e) => log(t('Không tải được trang: {error}', { error: e.message.split('\n')[0] })));
     };
     const openRoom = async (url) => {
       platform = pickPlatform(url);
@@ -138,8 +139,8 @@ export async function runSession(o) {
       unknownSince = null;
       aloneSince = null;
       joinAttempts = 0;
-      save({ platform: platform.id, url, phase: 'waiting_open', message: 'Đang chờ phòng mở' });
-      log(`Mở phòng [${platform.id}] ${url}`);
+      save({ platform: platform.id, url, phase: 'waiting_open', message: t('Đang chờ phòng mở') });
+      log(t('Mở phòng [{platform}] {url}', { platform: platform.id, url }));
       await navigate();
     };
     const endSegment = async () => {
@@ -157,7 +158,7 @@ export async function runSession(o) {
         silentLogged = false;
         return true;
       } catch (e) {
-        log(`Chưa bắt đầu ghi được: ${e.message.split('\n')[0]}`);
+        log(t('Chưa bắt đầu ghi được: {error}', { error: e.message.split('\n')[0] }));
         return false;
       }
     };
@@ -174,7 +175,7 @@ export async function runSession(o) {
       // 1) Lệnh điều khiển
       for (const cmd of drainCommands(dir)) {
         if (cmd.cmd === 'stop') {
-          log('Nhận lệnh stop');
+          log(t('Nhận lệnh stop'));
           endReason = 'stopped';
           // Dừng trong lúc bot đang báo "một mình / im lặng" → phần đuôi từ lúc đó là phòng trống, cắt bỏ.
           if (st.attention) trimFrom = Date.parse(st.attention.since);
@@ -182,17 +183,17 @@ export async function runSession(o) {
           try {
             pickPlatform(cmd.url);
           } catch (e) {
-            log(`Bỏ qua lệnh rejoin: ${e.message}`);
+            log(t('Bỏ qua lệnh rejoin: {error}', { error: e.message }));
             continue;
           }
-          log(`Nhận lệnh rejoin → ${cmd.url}`);
+          log(t('Nhận lệnh rejoin → {url}', { url: cmd.url }));
           await endSegment();
           if (cmd.passcode !== undefined) ctx.passcode = cmd.passcode;
           await openRoom(cmd.url);
         } else if (cmd.cmd === 'keep') {
           const mins = config.aloneMin > 0 ? config.aloneMin : 1;
           keepUntil = Date.now() + min(mins);
-          log(`Người dùng chọn chờ thêm ${mins} phút`);
+          log(t('Người dùng chọn chờ thêm {mins} phút', { mins }));
         }
       }
       if (endReason) break;
@@ -218,7 +219,7 @@ export async function runSession(o) {
       const state = await platform.detect(page, ctx).catch(() => 'unknown');
       const now = Date.now();
       if (state !== lastState) {
-        log(`Trạng thái: ${lastState ?? '-'} → ${state}`);
+        log(t('Trạng thái: {from} → {to}', { from: lastState ?? '-', to: state }));
         await snapshot(state);
         lastState = state;
         save({ state });
@@ -243,14 +244,14 @@ export async function runSession(o) {
         }
         joinAttempts = 0;
         if (capture.stalled()) {
-          log('Luồng ghi bị đứng — tạo đoạn ghi mới');
+          log(t('Luồng ghi bị đứng — tạo đoạn ghi mới'));
           await endSegment();
         }
         if (!capture.active && (await startSegment())) {
-          setPhase('recording', 'Đang ghi hình');
+          setPhase('recording', t('Đang ghi hình'));
           if (!notifiedJoin) {
             notifiedJoin = true;
-            tell(`🎥 Bot đã vào lớp "${title}" và đang ghi hình.`);
+            tell(t('🎥 Bot đã vào lớp "{title}" và đang ghi hình.', { title }));
           }
         }
         await platform.upkeep(page, ctx).catch(() => {});
@@ -258,13 +259,13 @@ export async function runSession(o) {
         // Theo dõi số người và tiếng trong phòng.
         const people = await platform.participantCount(page).catch(() => null);
         if (people !== lastPeople) {
-          if (people !== null) log(`Số người trong phòng: ${people}`);
+          if (people !== null) log(t('Số người trong phòng: {people}', { people }));
           lastPeople = people;
         }
         const level = await capture.level();
         const hasSound = level !== null && level > 0.003;
         if (hasSound) {
-          if (silentLogged) log('Phòng có tiếng trở lại');
+          if (silentLogged) log(t('Phòng có tiếng trở lại'));
           silentLogged = false;
           lastSoundAt = now;
           // Ai đang nói (đọc từ giao diện phòng họp). Nhiều hơn 2 người cùng "đang nói" thì bỏ qua lượt này cho khỏi nhiễu.
@@ -272,13 +273,13 @@ export async function runSession(o) {
           if (names.length && names.length <= 2) {
             const step = (now - (lastSpeakerAt || now - tickSec * 1000)) / 1000;
             for (const n of names) {
-              if (!(n in speakerSec)) log(`Nhận diện người nói: ${n}`);
+              if (!(n in speakerSec)) log(t('Nhận diện người nói: {n}', { n }));
               speakerSec[n] = (speakerSec[n] || 0) + Math.min(step, tickSec * 3);
             }
           }
           lastSpeakerAt = now;
           soundTicks++;
-          if (soundTicks === 200 && !Object.keys(speakerSec).length) log('Chưa nhận diện được người đang nói trên giao diện phòng này — sẽ không đoán được giảng viên');
+          if (soundTicks === 200 && !Object.keys(speakerSec).length) log(t('Chưa nhận diện được người đang nói trên giao diện phòng này — sẽ không đoán được giảng viên'));
           if (now - lastSpeakerSave > 30000 && Object.keys(speakerSec).length) {
             lastSpeakerSave = now;
             save({ speakers: roundSpeakers(speakerSec) });
@@ -288,15 +289,15 @@ export async function runSession(o) {
         }
         const silentSec = level === null ? null : Math.max(0, Math.round((now - lastSoundAt) / 1000));
         if (silentSec !== null && silentSec > 120 && !silentLogged) {
-          log('Phòng im lặng hơn 2 phút');
+          log(t('Phòng im lặng hơn 2 phút'));
           silentLogged = true;
         }
         if (room.reentryAt) {
           if ((people !== null && people >= 2) || hasSound) {
             room.reentryAt = null;
-            log('Phòng đã mở lại và có người — ghi tiếp');
+            log(t('Phòng đã mở lại và có người — ghi tiếp'));
           } else if (now - room.reentryAt > (o.reentryWaitMs || 60000)) {
-            log('Vào lại được link cũ nhưng phòng trống — rời phòng và chờ lệnh đổi phòng');
+            log(t('Vào lại được link cũ nhưng phòng trống — rời phòng và chờ lệnh đổi phòng'));
             const seg = await capture.stop();
             if (seg) fs.rmSync(seg.file, { force: true }); // đoạn ghi phòng trống, không đưa vào video
             room.noRetry = true;
@@ -305,7 +306,7 @@ export async function runSession(o) {
             room.deadline = Math.max(room.graceUntil || 0, now + 10000);
             await page.goto('about:blank').catch(() => {});
             lastState = null;
-            setPhase('grace', 'Phòng đã đóng. Chờ lệnh đổi phòng');
+            setPhase('grace', t('Phòng đã đóng. Chờ lệnh đổi phòng'));
             continue;
           }
         }
@@ -330,7 +331,7 @@ export async function runSession(o) {
           const autoEndAt = aloneSince + min(config.aloneMin);
           if (!keeping) {
             if (now > autoEndAt) {
-              log(`Chỉ còn một mình trong phòng hơn ${config.aloneMin} phút — coi như lớp đã tan`);
+              log(t('Chỉ còn một mình trong phòng hơn {mins} phút — coi như lớp đã tan', { mins: config.aloneMin }));
               endReason = 'room_empty';
               trimFrom = aloneSince;
             } else if (now - aloneSince > (o.attentionAfterMs || 60000)) {
@@ -346,7 +347,7 @@ export async function runSession(o) {
           const from = Math.max(lastSoundAt, silenceFloor);
           const autoEndAt = config.silenceEndMin > 0 ? from + min(config.silenceEndMin) : null;
           if (autoEndAt && now > autoEndAt) {
-            log(`Phòng im lặng tuyệt đối hơn ${config.silenceEndMin} phút — coi như lớp đã tan`);
+            log(t('Phòng im lặng tuyệt đối hơn {mins} phút — coi như lớp đã tan', { mins: config.silenceEndMin }));
             endReason = 'room_silent';
             trimFrom = from;
           } else if (now - from > 5 * 60000) {
@@ -356,7 +357,7 @@ export async function runSession(o) {
 
         // (c) Vào phòng đã lâu mà chưa từng thấy ai hay nghe thấy gì → lớp không diễn ra.
         if (!endReason && !room.sawOthers && !room.heardSound && now - room.enteredAt > min(config.waitOpenMin)) {
-          log(`Ở trong phòng hơn ${config.waitOpenMin} phút mà không có ai — kết thúc`);
+          log(t('Ở trong phòng hơn {mins} phút mà không có ai — kết thúc', { mins: config.waitOpenMin }));
           endReason = 'room_empty';
         }
 
@@ -364,10 +365,11 @@ export async function runSession(o) {
         if (attnNow !== attnKey) {
           attnKey = attnNow;
           if (attention) {
-            const what = attention.reason === 'alone' ? 'Bot đang ở một mình trong phòng' : 'Phòng im lặng hơn 5 phút';
-            log(`${what} — chờ người dùng quyết định`);
-            const until = attention.autoEndAt ? ` Không chọn thì bot tự dừng lúc ${new Date(attention.autoEndAt).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}.` : '';
-            tell(`⚠️ Lớp "${title}": ${what.toLowerCase()}, có vẻ lớp đã tan. Mở Class Recorder để chọn dừng ghi hay chờ tiếp.${until}${publicLink() ? `\n${publicLink()}` : ''}`);
+            const what = attention.reason === 'alone' ? t('Bot đang ở một mình trong phòng') : t('Phòng im lặng hơn 5 phút');
+            log(t('{what} — chờ người dùng quyết định', { what }));
+            const hhmm = attention.autoEndAt ? new Date(attention.autoEndAt).toLocaleTimeString(getLang() === 'en' ? 'en-GB' : 'vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+            const until = hhmm ? ' ' + t('Không chọn thì bot tự dừng lúc {time}.', { time: hhmm }) : '';
+            tell(t('⚠️ Lớp "{title}": {what}, có vẻ lớp đã tan. Mở Class Recorder để chọn dừng ghi hay chờ tiếp.', { title, what: what.toLowerCase() }) + until + (publicLink() ? `\n${publicLink()}` : ''));
           }
         }
         const audioKey = `${people}|${silentSec === null ? 'x' : silentSec < 20 ? 's' : Math.floor(silentSec / 60)}|${attnNow}`;
@@ -405,7 +407,7 @@ export async function runSession(o) {
         room.deadline = now + min(Math.max(config.graceMin, state === 'ended' ? 0 : 2));
         room.graceUntil = room.deadline;
         const mins = Math.round((room.deadline - now) / 60000);
-        setPhase('grace', `Đã rời phòng (${state}). Chờ lệnh rejoin hoặc phòng mở lại trong ~${mins} phút`);
+        setPhase('grace', t('Đã rời phòng ({state}). Chờ lệnh rejoin hoặc phòng mở lại trong ~{mins} phút', { state, mins }));
         log(st.message);
       }
 
@@ -423,22 +425,22 @@ export async function runSession(o) {
             await navigate();
             break;
           }
-          if (!room.closedAt) setPhase('joining', 'Đang vào phòng');
-          await platform.join(page, ctx).catch((e) => log(`Lỗi khi vào phòng: ${e.message.split('\n')[0]}`));
+          if (!room.closedAt) setPhase('joining', t('Đang vào phòng'));
+          await platform.join(page, ctx).catch((e) => log(t('Lỗi khi vào phòng: {error}', { error: e.message.split('\n')[0] })));
           break;
         case 'waiting_room':
-          if (!room.closedAt) setPhase('waiting_admit', 'Đã xin vào, đang chờ được duyệt');
+          if (!room.closedAt) setPhase('waiting_admit', t('Đã xin vào, đang chờ được duyệt'));
           break;
         case 'bot_blocked':
           // Chặn có chủ đích: kết thúc ngay, không thử lại, không tìm cách vượt qua.
-          log('Phòng chặn bot tự động — dừng lại');
+          log(t('Phòng chặn bot tự động — dừng lại'));
           endReason = 'bot_blocked';
           break;
         case 'needs_login':
           endReason = 'needs_login';
           break;
         case 'ended':
-          if (!room.closedAt) setPhase(waitingPhase, 'Phòng đang đóng — chờ mở');
+          if (!room.closedAt) setPhase(waitingPhase, t('Phòng đang đóng — chờ mở'));
           // Trước khi vào được lần đầu: luôn thử lại (đang chờ phòng mở). Sau khi phòng đóng: chỉ thử lại nếu được bật.
           if ((!room.closedAt || (config.retrySameLink && !room.noRetry)) && now - lastNav > 30000) await navigate();
           break;
@@ -446,7 +448,7 @@ export async function runSession(o) {
         case 'denied':
         case 'invalid':
           if (!room.closedAt) {
-            setPhase(waitingPhase, state === 'not_started' ? 'Phòng chưa mở — đang chờ' : state === 'denied' ? 'Bị từ chối/không ai duyệt — sẽ thử lại' : 'Link có vẻ không hợp lệ — sẽ thử lại (gửi rejoin nếu có link đúng)');
+            setPhase(waitingPhase, state === 'not_started' ? t('Phòng chưa mở — đang chờ') : state === 'denied' ? t('Bị từ chối/không ai duyệt — sẽ thử lại') : t('Link có vẻ không hợp lệ — sẽ thử lại (gửi rejoin nếu có link đúng)'));
           }
           if (now - lastNav > 30000) await navigate();
           break;
@@ -465,7 +467,7 @@ export async function runSession(o) {
   } catch (e) {
     failure = e;
     endReason = 'error';
-    log(`LỖI: ${e.stack || e.message}`);
+    log(t('LỖI: {error}', { error: e.stack || e.message }));
   } finally {
     process.off('SIGINT', onSignal);
     process.off('SIGTERM', onSignal);
@@ -476,8 +478,8 @@ export async function runSession(o) {
   for (const f of ['live.jpg', 'live.tmp.jpg']) fs.rmSync(path.join(dir, f), { force: true });
 
   // Hậu kỳ: luôn cố xuất những gì đã ghi được, kể cả khi phiên kết thúc do lỗi.
-  log(`Kết thúc phiên: ${END_TEXT[endReason] || endReason}`);
-  save({ phase: 'finalizing', endReason, message: 'Đang xử lý file ghi hình', attention: null });
+  log(t('Kết thúc phiên: {reason}', { reason: END_TEXT[endReason] || endReason }));
+  save({ phase: 'finalizing', endReason, message: t('Đang xử lý file ghi hình'), attention: null });
   // Lớp tan mà phòng không đóng: đoạn cuối video là phòng trống → chỉ giữ tới lúc mọi người rời đi (cộng một ít dư).
   let trimLastSeconds = null;
   const lastSeg = segments.at(-1);
@@ -485,7 +487,7 @@ export async function runSession(o) {
     const keep = (trimFrom - lastSeg.startedAt + (o.trimMarginMs ?? 20000)) / 1000;
     if (keep < (lastSeg.endedAt - lastSeg.startedAt) / 1000 - 8) {
       trimLastSeconds = Math.round(keep);
-      log(`Cắt bỏ phần đuôi phòng trống: giữ ${trimLastSeconds}s đầu của đoạn ghi cuối`);
+      log(t('Cắt bỏ phần đuôi phòng trống: giữ {sec}s đầu của đoạn ghi cuối', { sec: trimLastSeconds }));
     }
   }
 
@@ -495,7 +497,7 @@ export async function runSession(o) {
     const pick = pickInstructor(speakerSec, { minSeconds: o.speakerMinSeconds ?? 60 });
     instructor = pick ? pick.name : null;
     save({ speakers: roundSpeakers(speakerSec), instructor, instructorAuto: !!instructor });
-    log(pick ? `Đoán giảng viên: ${pick.name} (nói ${Math.round(pick.seconds / 60)} phút, ${Math.round(pick.share * 100)}% thời gian có người nói)` : 'Không đủ dữ liệu để đoán giảng viên');
+    log(pick ? t('Đoán giảng viên: {name} (nói {mins} phút, {pct}% thời gian có người nói)', { name: pick.name, mins: Math.round(pick.seconds / 60), pct: Math.round(pick.share * 100) }) : t('Không đủ dữ liệu để đoán giảng viên'));
   }
 
   let outputs = {};
@@ -511,12 +513,12 @@ export async function runSession(o) {
       onProgress: (message) => save({ message }),
     });
   } catch (e) {
-    log(`LỖI hậu kỳ: ${e.stack || e.message}`);
+    log(t('LỖI hậu kỳ: {error}', { error: e.stack || e.message }));
     failure = failure || e;
   }
 
   const lostRecording = segments.length > 0 && !outputs.recording;
-  if (lostRecording) failure = failure || new Error('Đã ghi nhưng không xuất được file — các đoạn gốc vẫn nằm trong thư mục parts/');
+  if (lostRecording) failure = failure || new Error(t('Đã ghi nhưng không xuất được file — các đoạn gốc vẫn nằm trong thư mục parts/'));
   const ok = !failure && !['never_opened', 'needs_login', 'bot_blocked'].includes(endReason);
   save({
     phase: ok ? 'done' : 'error',
@@ -525,9 +527,9 @@ export async function runSession(o) {
   });
   {
     // Thông báo kết quả: chỉ tên buổi, trạng thái và những gì đã tạo được — không kèm nội dung buổi học.
-    const mins = outputs.durationSeconds ? `${Math.round(outputs.durationSeconds / 60)} phút` : null;
-    const got = [outputs.recording && 'video', outputs.transcript && 'phiên âm', outputs.summary && 'tóm tắt'].filter(Boolean).join(', ');
-    const lines = [`${ok ? '✅' : '❌'} Buổi "${title}": ${st.message}.`, got ? `Đã có: ${got}${mins ? ` (${mins})` : ''}.` : 'Không ghi được gì.', ...(outputs.notes || []).map((n) => `Lưu ý: ${n}`), publicLink()].filter(Boolean);
+    const mins = outputs.durationSeconds ? t('{n} phút', { n: Math.round(outputs.durationSeconds / 60) }) : null;
+    const got = [outputs.recording && 'video', outputs.transcript && t('phiên âm'), outputs.summary && t('tóm tắt')].filter(Boolean).join(', ');
+    const lines = [`${ok ? '✅' : '❌'} ` + t('Buổi "{title}": {message}.', { title, message: st.message }), got ? t('Đã có: {got}.', { got: got + (mins ? ` (${mins})` : '') }) : t('Không ghi được gì.'), ...(outputs.notes || []).map((n) => t('Lưu ý: {note}', { note: n })), publicLink()].filter(Boolean);
     await tell(lines.join('\n'));
   }
   const active = readJson(paths.active());

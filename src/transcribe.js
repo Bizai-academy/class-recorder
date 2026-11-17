@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { ROOT, config, paths } from './config.js';
+import { t } from './i18n.js';
 import { sleep, hms } from './util.js';
 
 /**
@@ -30,10 +31,10 @@ export function apiProviders() {
   };
   const list = [];
   if (config.sttApiKey && config.sttBaseUrl) {
-    list.push(make('chính', config.sttBaseUrl, config.sttApiKey, config.sttModel, ['fish', 'openai'].includes(config.sttProvider) ? config.sttProvider : null));
+    list.push(make(t('chính'), config.sttBaseUrl, config.sttApiKey, config.sttModel, ['fish', 'openai'].includes(config.sttProvider) ? config.sttProvider : null));
   }
   if (config.sttBackupApiKey && config.sttBackupBaseUrl) {
-    list.push(make('dự phòng', config.sttBackupBaseUrl, config.sttBackupApiKey, config.sttBackupModel || 'whisper-large-v3'));
+    list.push(make(t('dự phòng'), config.sttBackupBaseUrl, config.sttBackupApiKey, config.sttBackupModel || 'whisper-large-v3'));
   }
   return list;
 }
@@ -58,7 +59,7 @@ export function toText(pieces) {
  */
 export function transcribeLocalPieces(wavFile, { log, onProgress = () => {}, offset = 0 }) {
   if (!localSttInstalled()) {
-    return Promise.reject(new Error('Chưa cài bộ phiên âm trên máy. Vào Cài đặt → "Cài bộ phiên âm trên máy" (hoặc chạy: node scripts/setup-stt.mjs)'));
+    return Promise.reject(new Error(t('Chưa cài bộ phiên âm trên máy. Vào Cài đặt → "Cài bộ phiên âm trên máy" (hoặc chạy: node scripts/setup-stt.mjs)')));
   }
   const args = [path.join(ROOT, 'stt-local', 'transcribe.py'), wavFile, '--model', config.sttLocalModel, '--models-dir', paths.models(), '--device', config.sttLocalDevice];
   if (config.sttLanguage) args.push('--language', config.sttLanguage);
@@ -95,14 +96,14 @@ export function transcribeLocalPieces(wavFile, { log, onProgress = () => {}, off
       for (const line of String(d).split('\n')) {
         const m = line.trim();
         if (!m.startsWith('[stt]')) continue;
-        log(m.replace('[stt]', 'Phiên âm tại máy:'));
-        if (/đã phiên âm/.test(m)) onProgress(`Đang phiên âm tại máy (${m.replace(/^.*đã phiên âm\s*/, '')})`);
+        log(m.replace('[stt]', t('Phiên âm tại máy:')));
+        if (/đã phiên âm/.test(m)) onProgress(t('Đang phiên âm tại máy ({progress})', { progress: m.replace(/^.*đã phiên âm\s*/, '') }));
       }
     });
-    child.on('error', (e) => reject(new Error(`Không chạy được bộ phiên âm tại máy: ${e.message}`)));
+    child.on('error', (e) => reject(new Error(t('Không chạy được bộ phiên âm tại máy: {error}', { error: e.message }))));
     child.on('close', (code) => {
-      if (code !== 0 || !meta) return reject(new Error(`Bộ phiên âm tại máy dừng với lỗi: ${errTail.trim().split('\n').slice(-2).join(' | ') || `mã ${code}`}`));
-      log(`Phiên âm tại máy xong: ${Math.round(meta.audioSeconds)}s âm thanh trong ${Math.round(meta.seconds)}s (nhanh gấp ${meta.speed} lần thời gian thực, ${meta.device}/${meta.compute})`);
+      if (code !== 0 || !meta) return reject(new Error(t('Bộ phiên âm tại máy dừng với lỗi: {error}', { error: errTail.trim().split('\n').slice(-2).join(' | ') || t('mã {code}', { code }) })));
+      log(t('Phiên âm tại máy xong: {audio}s âm thanh trong {sec}s (nhanh gấp {speed} lần thời gian thực, {device}/{compute})', { audio: Math.round(meta.audioSeconds), sec: Math.round(meta.seconds), speed: meta.speed, device: meta.device, compute: meta.compute }));
       resolve(pieces);
     });
   });
@@ -145,7 +146,7 @@ async function transcribeChunk(file, prov, { log, onProgress }) {
     try {
       res = await request(buf, name, format, prov);
     } catch (e) {
-      if (attempt >= 4) throw new Error(`Không kết nối được ${prov.name}: ${e.message}`);
+      if (attempt >= 4) throw new Error(t('Không kết nối được {name}: {error}', { name: prov.name, error: e.message }));
       await sleep(3000 * attempt);
       continue;
     }
@@ -162,7 +163,7 @@ async function transcribeChunk(file, prov, { log, onProgress }) {
         const wait = Math.min(retryAfter * 1000 + 1000, 15 * 60000);
         if (waited + wait <= RATE_LIMIT_BUDGET_MS) {
           waited += wait;
-          const msg = `Dịch vụ phiên âm ${prov.name} báo hết hạn mức — chờ ${Math.ceil(wait / 60000)} phút rồi gửi tiếp`;
+          const msg = t('Dịch vụ phiên âm {name} báo hết hạn mức — chờ {mins} phút rồi gửi tiếp', { name: prov.name, mins: Math.ceil(wait / 60000) });
           log(msg);
           onProgress(msg);
           await sleep(wait);
@@ -173,14 +174,14 @@ async function transcribeChunk(file, prov, { log, onProgress }) {
         await sleep(5000 * attempt);
         continue;
       }
-      throw new Error(`${prov.name} báo hết hạn mức (429): ${body}`);
+      throw new Error(t('{name} báo hết hạn mức (429): {body}', { name: prov.name, body }));
     }
     if (res.status >= 500 && attempt < 4) {
-      log(`Dịch vụ phiên âm ${prov.name} trả ${res.status}, thử lại lần ${attempt + 1}...`);
+      log(t('Dịch vụ phiên âm {name} trả {status}, thử lại lần {n}...', { name: prov.name, status: res.status, n: attempt + 1 }));
       await sleep(5000 * attempt);
       continue;
     }
-    throw new Error(`${prov.name} trả lỗi ${res.status}: ${body}`);
+    throw new Error(t('{name} trả lỗi {status}: {body}', { name: prov.name, status: res.status, body }));
   }
 }
 
@@ -190,16 +191,16 @@ async function transcribeChunk(file, prov, { log, onProgress }) {
  * Trả về { pieces, doneChunks, switchedAtChunk, error }: error khác null nghĩa là dừng giữa chừng sau `doneChunks` khúc.
  */
 export async function transcribeChunks(chunks, { chunkSeconds, log, onProgress = () => {}, providers = apiProviders() }) {
-  if (!chunks.length) throw new Error('Không có file âm thanh để phiên âm');
-  if (!providers.length) throw new Error('Chưa đặt API key phiên âm');
+  if (!chunks.length) throw new Error(t('Không có file âm thanh để phiên âm'));
+  if (!providers.length) throw new Error(t('Chưa đặt API key phiên âm'));
   const pieces = [];
   let active = 0;
   let switchedAtChunk = null;
   for (let i = 0; i < chunks.length; i++) {
     for (;;) {
       const prov = providers[active];
-      log(`Phiên âm ${i + 1}/${chunks.length} (${prov.name})...`);
-      onProgress(`Đang phiên âm ${i + 1}/${chunks.length}`);
+      log(t('Phiên âm {i}/{total} ({name})...', { i: i + 1, total: chunks.length, name: prov.name }));
+      onProgress(t('Đang phiên âm {i}/{total}', { i: i + 1, total: chunks.length }));
       try {
         const data = await transcribeChunk(chunks[i], prov, { log, onProgress });
         const offset = i * chunkSeconds;
@@ -215,7 +216,7 @@ export async function transcribeChunks(chunks, { chunkSeconds, log, onProgress =
         break;
       } catch (e) {
         if (active + 1 < providers.length) {
-          log(`Dịch vụ phiên âm ${prov.label} (${prov.name}) lỗi: ${e.message} — chuyển sang dịch vụ ${providers[active + 1].label} (${providers[active + 1].name})`);
+          log(t('Dịch vụ phiên âm {label} ({name}) lỗi: {error} — chuyển sang dịch vụ {nextLabel} ({nextName})', { label: prov.label, name: prov.name, error: e.message, nextLabel: providers[active + 1].label, nextName: providers[active + 1].name }));
           active++;
           switchedAtChunk ??= i;
           continue;

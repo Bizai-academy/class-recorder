@@ -1,6 +1,7 @@
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { config } from './config.js';
+import { t } from './i18n.js';
 import { readJson, writeJsonAtomic } from './util.js';
 
 /**
@@ -23,7 +24,7 @@ export async function notify(text, { log = () => {} } = {}) {
     writeJsonAtomic(file(), list.slice(0, KEEP));
     return true;
   } catch (e) {
-    log(`Không lưu được thông báo: ${e.message}`);
+    log(t('Không lưu được thông báo: {error}', { error: e.message }));
     return false;
   }
 }

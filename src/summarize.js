@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { config } from './config.js';
 import { hms } from './util.js';
+import { t } from './i18n.js';
 
 const SYSTEM = (language) => `Bạn là trợ lý ghi chép cho một học viên. Bạn nhận bản phiên âm tự động (speech-to-text) của một buổi học online, mỗi đoạn mở đầu bằng mốc thời gian [hh:mm:ss].
 
@@ -8,7 +9,7 @@ Bối cảnh cần biết: bản phiên âm do máy tạo nên có thể sai ch�
 
 Mục tiêu: người vắng buổi học đọc xong nắm được nội dung và biết mình phải làm gì tiếp theo; người đã dự lớp dùng làm tài liệu ôn tập. Chỉ dựa trên những gì có trong bản phiên âm — không thêm kiến thức ngoài bài như thể giảng viên đã nói.
 
-Viết bằng ${language}, định dạng Markdown, theo các mục sau (bỏ mục nào không có nội dung):
+Viết bằng ${language}, định dạng Markdown, theo các mục sau (bỏ mục nào không có nội dung). Tên các mục bên dưới chỉ là khung gợi ý: hãy dịch tiêu đề mục sang ${language}, toàn bộ bản tóm tắt (kể cả tiêu đề) phải viết bằng ${language}:
 
 # <Tên buổi học> — tóm tắt
 ## Tổng quan
@@ -59,28 +60,28 @@ export async function summarize({ transcript, title, startedAt, durationSeconds,
     message = await run(useFallbacks);
   } catch (e) {
     if (e instanceof Anthropic.AuthenticationError) {
-      throw new Error('Chưa có/ sai ANTHROPIC_API_KEY — đặt key trong .env rồi chạy lại `classrec process`');
+      throw new Error(t('Chưa có/ sai ANTHROPIC_API_KEY — đặt key trong .env rồi chạy lại `classrec process`'));
     }
     if (useFallbacks && e instanceof Anthropic.BadRequestError) {
-      log('API không nhận tham số fallbacks — gọi lại không kèm fallbacks');
+      log(t('API không nhận tham số fallbacks — gọi lại không kèm fallbacks'));
       message = await run(false);
     } else if (e instanceof Anthropic.APIError) {
-      throw new Error(`Claude API lỗi ${e.status ?? ''}: ${e.message}`);
+      throw new Error(t('Claude API lỗi {status}: {error}', { status: e.status ?? '', error: e.message }));
     } else {
       throw e;
     }
   }
 
   if (message.stop_reason === 'refusal') {
-    throw new Error(`Model từ chối tóm tắt nội dung này (${message.stop_details?.category ?? 'không rõ lý do'})`);
+    throw new Error(t('Model từ chối tóm tắt nội dung này ({reason})', { reason: message.stop_details?.category ?? t('không rõ lý do') }));
   }
   let text = message.content
     .filter((b) => b.type === 'text')
     .map((b) => b.text)
     .join('\n')
     .trim();
-  if (!text) throw new Error('Model không trả về nội dung');
-  if (message.stop_reason === 'max_tokens') text += '\n\n> Lưu ý: bản tóm tắt bị cắt do vượt giới hạn độ dài đầu ra.';
-  log(`Tóm tắt xong (model ${message.model}, vào ${message.usage?.input_tokens ?? '?'} / ra ${message.usage?.output_tokens ?? '?'} token)`);
+  if (!text) throw new Error(t('Model không trả về nội dung'));
+  if (message.stop_reason === 'max_tokens') text += '\n\n> ' + t('Lưu ý: bản tóm tắt bị cắt do vượt giới hạn độ dài đầu ra.');
+  log(t('Tóm tắt xong (model {model}, vào {input} / ra {output} token)', { model: message.model, input: message.usage?.input_tokens ?? '?', output: message.usage?.output_tokens ?? '?' }));
   return text + '\n';
 }

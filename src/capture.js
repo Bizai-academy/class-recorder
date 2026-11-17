@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { config } from './config.js';
+import { t } from './i18n.js';
 import { sleep } from './util.js';
 
 /**
@@ -181,12 +182,12 @@ export class Capture {
       await cdp.detach().catch(() => {});
       if (res.exceptionDetails) {
         const d = res.exceptionDetails;
-        throw new Error(d.exception?.description || d.text || 'getDisplayMedia thất bại');
+        throw new Error(d.exception?.description || d.text || t('getDisplayMedia thất bại'));
       }
       const info = res.result?.value || {};
-      this.log(`Bắt đầu ghi → ${path.basename(file)} (${info.mime || '?'}, video=${info.videoTracks}, audio=${info.audioTracks})`);
-      if (!info.audioTracks) this.log('CẢNH BÁO: không lấy được tiếng của tab — file sẽ không có âm thanh.');
-      else if (/fake/i.test(info.audioLabel || '')) this.log(`CẢNH BÁO: nguồn tiếng là "${info.audioLabel}" chứ không phải tiếng của tab — file sẽ bị câm.`);
+      this.log(t('Bắt đầu ghi → {file} ({mime}, video={video}, audio={audio})', { file: path.basename(file), mime: info.mime || '?', video: info.videoTracks, audio: info.audioTracks }));
+      if (!info.audioTracks) this.log(t('CẢNH BÁO: không lấy được tiếng của tab — file sẽ không có âm thanh.'));
+      else if (/fake/i.test(info.audioLabel || '')) this.log(t('CẢNH BÁO: nguồn tiếng là "{label}" chứ không phải tiếng của tab — file sẽ bị câm.', { label: info.audioLabel }));
       return { file, ...info };
     } catch (e) {
       out.destroy();
@@ -222,7 +223,7 @@ export class Capture {
     this.current = null;
     await new Promise((r) => c.out.end(r));
     const seconds = Math.round((Date.now() - c.startedAt) / 1000);
-    this.log(`Dừng ghi ${path.basename(c.file)} — ${(c.bytes / 1e6).toFixed(1)} MB, ~${seconds}s`);
+    this.log(t('Dừng ghi {file} — {mb} MB, ~{seconds}s', { file: path.basename(c.file), mb: (c.bytes / 1e6).toFixed(1), seconds }));
     return { file: c.file, bytes: c.bytes, startedAt: c.startedAt, endedAt: Date.now() };
   }
 }

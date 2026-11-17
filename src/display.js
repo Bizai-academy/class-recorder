@@ -1,5 +1,6 @@
 import { spawn, execFileSync } from 'node:child_process';
 import { config } from './config.js';
+import { t } from './i18n.js';
 import { sleep } from './util.js';
 
 /**
@@ -20,10 +21,10 @@ export async function ensureDisplay(log) {
       await sleep(1200);
       if (failed) {
         xvfb = null;
-        log('Không bật được Xvfb — sẽ chạy trình duyệt ở chế độ headless. (Cài: apt install xvfb)');
+        log(t('Không bật được Xvfb — sẽ chạy trình duyệt ở chế độ headless. (Cài: apt install xvfb)'));
       } else {
         process.env.DISPLAY = `:${n}`;
-        log(`Đã bật màn hình ảo Xvfb :${n}`);
+        log(t('Đã bật màn hình ảo Xvfb :{n}', { n }));
       }
     } catch {
       xvfb = null;
@@ -37,9 +38,9 @@ export async function ensureDisplay(log) {
     try {
       execFileSync('pulseaudio', ['--start', '--exit-idle-time=-1'], { stdio: 'ignore', timeout: 8000 });
       await sleep(800);
-      log('Đã bật PulseAudio');
+      log(t('Đã bật PulseAudio'));
     } catch {
-      log('Không bật được PulseAudio (bỏ qua). Nếu file ghi không có tiếng, hãy cài: apt install pulseaudio');
+      log(t('Không bật được PulseAudio (bỏ qua). Nếu file ghi không có tiếng, hãy cài: apt install pulseaudio'));
     }
   }
   try {

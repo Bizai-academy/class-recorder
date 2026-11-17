@@ -181,7 +181,7 @@ Tải file cài đặt ở mục [Releases](../../releases). File chưa có ch�
 Người dùng cuối không cần cài Node hay thư viện: bản đóng gói kèm sẵn tất cả, chỉ cần máy có Chrome hoặc Edge.
 
 - **Dùng:** chạy file cài đặt `ClassRecorder-Setup-<bản>.exe` (hoặc giải nén file zip), rồi bấm đúp **Class Recorder**. Lần đầu vào tab Cài đặt để dán key phiên âm và key tóm tắt.
-- **Dựng bản mới** (trên máy phát triển): `node scripts/build-windows.mjs` → kết quả nằm trong `dist/`. Muốn có file cài đặt thì máy cần Inno Setup 6.
+- **Dựng bản mới** (trên máy phát triển): `node scripts/build.mjs` → kết quả nằm trong `dist/`. Muốn có file cài đặt thì máy cần Inno Setup 6.
 - Gỡ cài đặt chỉ xoá chương trình; thư mục `data` (video, phiên âm, tóm tắt) và file `.env` (key) được giữ lại.
 
 ## Đóng góp

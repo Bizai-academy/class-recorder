@@ -5,6 +5,7 @@ import ffmpegStatic from 'ffmpeg-static';
 import { config } from './config.js';
 import { transcribeChunks, transcribeLocalPieces, apiProviders, toText, sttProvider, localSttInstalled } from './transcribe.js';
 import { summarize } from './summarize.js';
+import { t } from './i18n.js';
 
 const CHUNK_SECONDS = 600;
 
@@ -73,7 +74,7 @@ async function buildRecording(dir, parts, log, trimLastSeconds = null) {
     const cut = trimLastSeconds && f === parts.at(-1) ? ['-t', String(trimLastSeconds)] : [];
     const r = await runFfmpeg(['-y', '-i', f, '-map', '0:v:0', '-map', '0:a:0?', '-c', 'copy', ...cut, n]);
     if (r.code === 0 && fs.existsSync(n) && fs.statSync(n).size > 20000) normalized.push(n);
-    else log(`Bỏ qua đoạn không đọc được: ${path.basename(f)}`);
+    else log(t('Bỏ qua đoạn không đọc được: {file}', { file: path.basename(f) }));
   }
   const cleanup = () => normalized.forEach((n) => fs.rmSync(n, { force: true }));
   if (!normalized.length) return null;
@@ -86,11 +87,11 @@ async function buildRecording(dir, parts, log, trimLastSeconds = null) {
     fs.writeFileSync(list, normalized.map((f) => `file '${f.replace(/\\/g, '/').replace(/'/g, "'\\''")}'`).join('\n'));
     input = ['-f', 'concat', '-safe', '0', '-i', list];
   }
-  log(`Ghép ${normalized.length} đoạn → ${path.basename(out)}`);
+  log(t('Ghép {n} đoạn → {file}', { n: normalized.length, file: path.basename(out) }));
   const r = await runFfmpeg(['-y', ...input, ...codec, out]);
   cleanup();
   if (r.code !== 0 || !fs.existsSync(out) || fs.statSync(out).size < 20000) {
-    log(`Ghép file thất bại (giữ nguyên các đoạn trong parts/): ${r.stderr.split('\n').slice(-4).join(' | ')}`);
+    log(t('Ghép file thất bại (giữ nguyên các đoạn trong parts/): {error}', { error: r.stderr.split('\n').slice(-4).join(' | ') }));
     fs.rmSync(out, { force: true });
     if (good.length === 1) {
       const fallback = path.join(dir, 'recording.webm');
@@ -108,7 +109,7 @@ async function extractAudio(dir, recording, log) {
   fs.mkdirSync(audioDir, { recursive: true });
   const r = await runFfmpeg(['-y', '-i', recording, '-vn', '-ac', '1', '-ar', '16000', '-c:a', 'libmp3lame', '-b:a', '48k', '-f', 'segment', '-segment_time', String(CHUNK_SECONDS), path.join(audioDir, 'chunk-%03d.mp3')]);
   if (r.code !== 0) {
-    log(`Tách âm thanh thất bại: ${r.stderr.split('\n').slice(-3).join(' | ')}`);
+    log(t('Tách âm thanh thất bại: {error}', { error: r.stderr.split('\n').slice(-3).join(' | ') }));
     return [];
   }
   return fs
@@ -132,18 +133,18 @@ export async function postprocess(dir, { parts, title, startedAt, log, withSumma
     recording = ['recording.webm', 'recording.mp4'].map((f) => path.join(dir, f)).find((f) => fs.existsSync(f)) || null;
   }
   if (!recording) {
-    log('Không có đoạn ghi hình nào để xuất.');
-    outputs.notes = ['Không ghi được hình (chưa vào được phòng).'];
+    log(t('Không có đoạn ghi hình nào để xuất.'));
+    outputs.notes = [t('Không ghi được hình (chưa vào được phòng).')];
     return outputs;
   }
   const info = await probe(recording);
   outputs.recording = recording;
   outputs.durationSeconds = info.duration ? Math.round(info.duration) : null;
-  log(`File ghi hình: ${recording} (${info.duration ? Math.round(info.duration) + 's' : '?'}, video=${info.hasVideo}, audio=${info.hasAudio})`);
+  log(t('File ghi hình: {file} ({duration}, video={video}, audio={audio})', { file: recording, duration: info.duration ? Math.round(info.duration) + 's' : '?', video: info.hasVideo, audio: info.hasAudio }));
 
   if (!withSummary) return outputs;
   if (!info.hasAudio) {
-    notes.push('File ghi không có âm thanh nên không thể phiên âm/tóm tắt.');
+    notes.push(t('File ghi không có âm thanh nên không thể phiên âm/tóm tắt.'));
     outputs.notes = notes;
     return outputs;
   }
@@ -157,19 +158,19 @@ export async function postprocess(dir, { parts, title, startedAt, log, withSumma
   if (local ? !localSttInstalled() : !providers.length && !canLocal) {
     notes.push(
       local
-        ? 'Đã chọn phiên âm trên máy nhưng chưa cài bộ phiên âm, nên bỏ qua phiên âm và tóm tắt. Cài ở tab Cài đặt rồi chạy lại: classrec process ' + path.basename(dir)
-        : 'Chưa đặt API key phiên âm nên bỏ qua phiên âm và tóm tắt. Thêm key (hoặc chọn phiên âm trên máy) trong Cài đặt rồi chạy lại: classrec process ' + path.basename(dir),
+        ? t('Đã chọn phiên âm trên máy nhưng chưa cài bộ phiên âm, nên bỏ qua phiên âm và tóm tắt. Cài ở tab Cài đặt rồi chạy lại: classrec process ') + path.basename(dir)
+        : t('Chưa đặt API key phiên âm nên bỏ qua phiên âm và tóm tắt. Thêm key (hoặc chọn phiên âm trên máy) trong Cài đặt rồi chạy lại: classrec process ') + path.basename(dir),
     );
     log(notes.at(-1));
   } else {
     try {
-      onProgress(local ? 'Đang phiên âm tại máy' : 'Đang phiên âm');
+      onProgress(local ? t('Đang phiên âm tại máy') : t('Đang phiên âm'));
       // Tại máy: đưa thẳng một file tiếng (WAV mono 16 kHz) cho mô hình, không cần cắt khúc.
       // fromSec > 0: chỉ phiên âm phần còn lại của buổi học (khi dịch vụ API dừng giữa chừng).
       const runLocal = async (fromSec = 0) => {
         const wav = path.join(dir, 'audio.wav');
         const r = await runFfmpeg(['-y', ...(fromSec ? ['-ss', String(fromSec)] : []), '-i', recording, '-vn', '-ac', '1', '-ar', '16000', wav]);
-        if (r.code !== 0) throw new Error('Không tách được âm thanh từ video');
+        if (r.code !== 0) throw new Error(t('Không tách được âm thanh từ video'));
         try {
           return await transcribeLocalPieces(wav, { log, onProgress, offset: fromSec });
         } finally {
@@ -186,19 +187,19 @@ export async function postprocess(dir, { parts, title, startedAt, log, withSumma
         pieces = r.pieces;
         const minute = (chunk) => Math.round((chunk * CHUNK_SECONDS) / 60);
         if (r.switchedAtChunk !== null && r.doneChunks > r.switchedAtChunk) {
-          notes.push(`Dịch vụ phiên âm chính bị lỗi từ phút ${minute(r.switchedAtChunk)}; phần sau đó do dịch vụ dự phòng phiên âm.`);
+          notes.push(t('Dịch vụ phiên âm chính bị lỗi từ phút {minute}; phần sau đó do dịch vụ dự phòng phiên âm.', { minute: minute(r.switchedAtChunk) }));
         }
         if (r.error) {
           // Mọi dịch vụ API đều dừng (hết tiền, hết hạn mức, mất mạng). Phần đã phiên âm vẫn được giữ.
           const reason = r.error.message.split('\n')[0];
           if (canLocal) {
-            log(`Dịch vụ phiên âm dừng ở phút ${minute(r.doneChunks)} (${reason}) — phần còn lại phiên âm tại máy`);
-            notes.push(`Dịch vụ phiên âm qua API dừng ở phút ${minute(r.doneChunks)} (${reason}); phần còn lại được phiên âm tại máy.`);
-            onProgress('Đang phiên âm tại máy');
+            log(t('Dịch vụ phiên âm dừng ở phút {minute} ({reason}) — phần còn lại phiên âm tại máy', { minute: minute(r.doneChunks), reason }));
+            notes.push(t('Dịch vụ phiên âm qua API dừng ở phút {minute} ({reason}); phần còn lại được phiên âm tại máy.', { minute: minute(r.doneChunks), reason }));
+            onProgress(t('Đang phiên âm tại máy'));
             pieces.push(...(await runLocal(r.doneChunks * CHUNK_SECONDS)));
           } else if (pieces.length) {
-            log(`Dịch vụ phiên âm dừng ở phút ${minute(r.doneChunks)}: ${reason}`);
-            notes.push(`Phiên âm dừng ở phút ${minute(r.doneChunks)} (${reason}). Bản phiên âm và tóm tắt chỉ gồm phần trước đó; sửa xong thì bấm "Phiên âm và tóm tắt lại".`);
+            log(t('Dịch vụ phiên âm dừng ở phút {minute}: {reason}', { minute: minute(r.doneChunks), reason }));
+            notes.push(t('Phiên âm dừng ở phút {minute} ({reason}). Bản phiên âm và tóm tắt chỉ gồm phần trước đó; sửa xong thì bấm "Phiên âm và tóm tắt lại".', { minute: minute(r.doneChunks), reason }));
           } else {
             throw r.error;
           }
@@ -207,9 +208,9 @@ export async function postprocess(dir, { parts, title, startedAt, log, withSumma
       transcript = toText(pieces);
       fs.writeFileSync(transcriptFile, transcript);
       outputs.transcript = transcriptFile;
-      log(`Bản phiên âm: ${transcriptFile} (${transcript.length} ký tự)`);
+      log(t('Bản phiên âm: {transcriptFile} ({n} ký tự)', { transcriptFile, n: transcript.length }));
     } catch (e) {
-      notes.push(`Phiên âm thất bại: ${e.message.split('\n')[0]}`);
+      notes.push(t('Phiên âm thất bại: {error}', { error: e.message.split('\n')[0] }));
       log(notes.at(-1));
     }
   }
@@ -217,18 +218,18 @@ export async function postprocess(dir, { parts, title, startedAt, log, withSumma
   // Tóm tắt
   if (transcript && transcript.trim().length > 200) {
     try {
-      onProgress('Đang tạo bản tóm tắt');
+      onProgress(t('Đang tạo bản tóm tắt'));
       const md = await summarize({ transcript, title, startedAt, durationSeconds: outputs.durationSeconds, instructor, log });
       const summaryFile = path.join(dir, 'summary.md');
       fs.writeFileSync(summaryFile, md);
       outputs.summary = summaryFile;
-      log(`Bản tóm tắt: ${summaryFile}`);
+      log(t('Bản tóm tắt: {summaryFile}', { summaryFile }));
     } catch (e) {
-      notes.push(`Tóm tắt thất bại: ${e.message.split('\n')[0]} — bản phiên âm vẫn có ở transcript.txt`);
+      notes.push(t('Tóm tắt thất bại: {error} — bản phiên âm vẫn có ở transcript.txt', { error: e.message.split('\n')[0] }));
       log(notes.at(-1));
     }
   } else if (transcript) {
-    notes.push('Bản phiên âm quá ngắn (gần như không có lời nói) nên không tạo tóm tắt.');
+    notes.push(t('Bản phiên âm quá ngắn (gần như không có lời nói) nên không tạo tóm tắt.'));
   }
 
   if (notes.length) outputs.notes = notes;

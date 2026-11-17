@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { config } from './config.js';
+import { t } from './i18n.js';
 import { readJson, writeJsonAtomic } from './util.js';
 import { pickPlatform } from './platforms/index.js';
 
@@ -20,17 +21,17 @@ export const saveSchedules = (list) => writeJsonAtomic(FILE(), list);
 /** Kiểm tra dữ liệu người dùng nhập và trả về một mục lịch hợp lệ. Ném lỗi (tiếng Việt) nếu sai. */
 export function makeSchedule(input) {
   const url = String(input.url || '').trim();
-  if (!url) throw new Error('Hãy dán link phòng học.');
+  if (!url) throw new Error(t('Hãy dán link phòng học.'));
   pickPlatform(url);
   const time = String(input.time || '').trim();
-  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('Giờ bắt đầu phải có dạng HH:MM, ví dụ 19:25.');
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error(t('Giờ bắt đầu phải có dạng HH:MM, ví dụ 19:25.'));
   const date = String(input.date || '').trim();
-  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Ngày phải có dạng YYYY-MM-DD.');
+  if (date && !/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error(t('Ngày phải có dạng YYYY-MM-DD.'));
   const days = [...new Set((input.days || []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 6))].sort();
-  if (!date && !days.length) throw new Error('Hãy chọn ít nhất một thứ trong tuần, hoặc một ngày cụ thể.');
+  if (!date && !days.length) throw new Error(t('Hãy chọn ít nhất một thứ trong tuần, hoặc một ngày cụ thể.'));
   return {
     id: crypto.randomBytes(5).toString('hex'),
-    title: String(input.title || '').trim().slice(0, 120) || 'Buổi học',
+    title: String(input.title || '').trim().slice(0, 120) || t('Buổi học'),
     url,
     passcode: String(input.passcode || '').trim(),
     time,

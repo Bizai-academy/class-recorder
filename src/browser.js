@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { config, paths } from './config.js';
+import { t } from './i18n.js';
 
 /** Tìm Chrome/Edge đã cài. Trả về '' nếu không thấy (khi đó dùng Chromium của Playwright). */
 export function findBrowserExecutable() {
@@ -16,8 +17,14 @@ export function findBrowserExecutable() {
           `${process.env.PROGRAMFILES}\\Microsoft\\Edge\\Application\\msedge.exe`,
         ]
       : process.platform === 'darwin'
-        ? ['/Applications/Google Chrome.app/Contents/MacOS/Google Chrome']
-        : ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/opt/google/chrome/chrome', '/usr/bin/chromium', '/usr/bin/chromium-browser'];
+        ? [
+            '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+            `${process.env.HOME}/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`,
+            '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+            '/Applications/Chromium.app/Contents/MacOS/Chromium',
+            '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
+          ]
+        : ['/usr/bin/google-chrome-stable', '/usr/bin/google-chrome', '/opt/google/chrome/chrome', '/usr/bin/microsoft-edge', '/usr/bin/microsoft-edge-stable', '/usr/bin/chromium', '/usr/bin/chromium-browser', '/snap/bin/chromium'];
   return candidates.find((p) => p && fs.existsSync(p)) || '';
 }
 
@@ -102,7 +109,7 @@ export async function launchBrowser({ profile = 'default', headless = resolveHea
   // một phần khung hình). Riêng Linux chạy bằng root thì Chrome không cho bật sandbox.
   const isLinuxRoot = process.platform === 'linux' && typeof process.getuid === 'function' && process.getuid() === 0;
 
-  log(`Mở trình duyệt: ${executablePath || 'Chromium (Playwright)'} · headless=${headless} · profile=${profileDir}`);
+  log(t('Mở trình duyệt: {exe} · headless={headless} · profile={profile}', { exe: executablePath || 'Chromium (Playwright)', headless, profile: profileDir }));
   const context = await chromium.launchPersistentContext(profileDir, {
     headless,
     executablePath: executablePath || undefined,

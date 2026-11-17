@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { ROOT, paths } from './config.js';
+import { t, getLang } from './i18n.js';
 
 /** Đọc/ghi cài đặt trong file .env cho giao diện. Giá trị mặc định ở đây phải khớp với src/config.js. */
 
@@ -9,7 +10,10 @@ export const ENV_FILE = path.join(ROOT, '.env');
 export const SCHEMA = [
   {
     title: 'Trong phòng học',
-    fields: [{ key: 'BOT_NAME', label: 'Tên hiển thị của bot', type: 'text', default: 'Bot ghi hinh buoi hoc', help: 'Giảng viên và các bạn học sẽ thấy tên này trong danh sách người tham dự.' }],
+    fields: [
+      { key: 'APP_LANG', label: 'Ngôn ngữ giao diện', type: 'select', default: 'vi', options: [['vi', 'Tiếng Việt'], ['en', 'English']], help: 'Áp dụng cho giao diện, thông báo và nhật ký. Ngôn ngữ bản tóm tắt chỉnh riêng ở mục Tóm tắt.' },
+      { key: 'BOT_NAME', label: 'Tên hiển thị của bot', type: 'text', default: 'Bot ghi hinh buoi hoc', help: 'Giảng viên và các bạn học sẽ thấy tên này trong danh sách người tham dự.' },
+    ],
   },
   {
     title: 'Phiên âm (chuyển tiếng nói thành chữ)',
@@ -119,11 +123,12 @@ function formatValue(v) {
 /** Trả về cấu trúc cho giao diện. Key bí mật không bao giờ được gửi ra — chỉ báo đã đặt hay chưa và 4 ký tự cuối. */
 export function readSettings() {
   const env = readEnv();
+  // Dịch nhãn tại thời điểm gửi cho giao diện (SCHEMA giữ nguyên tiếng Việt làm khoá).
   return SCHEMA.map((g) => ({
-    title: g.title,
+    title: t(g.title),
     id: g.id || null,
     fields: g.fields.map((f) => {
-      const base = { key: f.key, label: f.label, type: f.type, help: f.help || '', options: f.options || null, min: f.min ?? null, max: f.max ?? null };
+      const base = { key: f.key, label: t(f.label), type: f.type, help: f.help ? t(f.help) : '', options: f.options ? f.options.map(([v, l]) => [v, t(l)]) : null, min: f.min ?? null, max: f.max ?? null };
       if (f.type === 'secret') {
         const v = env[f.key] || '';
         return { ...base, isSet: !!v, hint: v ? v.slice(-4) : '' };
@@ -132,7 +137,9 @@ export function readSettings() {
         const [w, h] = f.virtual.map((k) => env[k]);
         return { ...base, value: w && h ? `${w}x${h}` : f.default };
       }
-      return { ...base, value: env[f.key] !== undefined ? env[f.key] : f.default };
+      // Ngôn ngữ tóm tắt chưa đặt thì mặc định theo ngôn ngữ giao diện (khớp src/config.js).
+      const def = f.key === 'SUMMARY_LANGUAGE' ? (getLang() === 'en' ? 'English' : 'tiếng Việt') : f.default;
+      return { ...base, value: env[f.key] !== undefined ? env[f.key] : def };
     }),
   }));
 }
@@ -160,13 +167,13 @@ export function saveSettings(values) {
     } else if (f.type === 'number') {
       const n = Number(v);
       if (!Number.isFinite(n) || (f.min !== undefined && n < f.min) || (f.max !== undefined && n > f.max)) {
-        throw new Error(`"${f.label}" phải là số${f.min !== undefined ? ` từ ${f.min}` : ''}${f.max !== undefined ? ` đến ${f.max}` : ''}.`);
+        throw new Error(t('"{label}" phải là số{range}.', { label: t(f.label), range: (f.min !== undefined ? t(' từ {min}', { min: f.min }) : '') + (f.max !== undefined ? t(' đến {max}', { max: f.max }) : '') }));
       }
       updates[f.key] = String(n);
     } else if (f.type === 'bool') {
       updates[f.key] = v === 'true' ? 'true' : 'false';
     } else if (f.type === 'select') {
-      if (!f.options.some(([o]) => o === v)) throw new Error(`Giá trị không hợp lệ cho "${f.label}".`);
+      if (!f.options.some(([o]) => o === v)) throw new Error(t('Giá trị không hợp lệ cho "{label}".', { label: t(f.label) }));
       if (f.virtual) {
         const [w, h] = v.split('x');
         updates[f.virtual[0]] = w;
@@ -180,7 +187,7 @@ export function saveSettings(values) {
   }
   for (const k of ['STT_BASE_URL', 'STT_BACKUP_BASE_URL']) {
     if (updates[k] !== undefined && updates[k] !== '' && !/^https?:\/\//i.test(updates[k])) {
-      throw new Error('Địa chỉ dịch vụ phiên âm phải bắt đầu bằng http:// hoặc https://');
+      throw new Error(t('Địa chỉ dịch vụ phiên âm phải bắt đầu bằng http:// hoặc https://'));
     }
   }
 

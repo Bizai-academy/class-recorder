@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { paths } from './config.js';
+import { t } from './i18n.js';
 import { readJson, isAlive } from './util.js';
 
 /**
@@ -29,13 +30,13 @@ export function listSessions() {
 export function resolveSession(id) {
   if (id) {
     const dir = fs.existsSync(id) && fs.statSync(id).isDirectory() ? path.resolve(id) : sessionDir(id);
-    if (!fs.existsSync(dir)) throw new Error(`Không tìm thấy phiên: ${id}`);
+    if (!fs.existsSync(dir)) throw new Error(t('Không tìm thấy phiên: {id}', { id }));
     return dir;
   }
   const active = readJson(paths.active());
   if (active?.dir && fs.existsSync(active.dir)) return active.dir;
   const all = listSessions();
-  if (!all.length) throw new Error('Chưa có phiên ghi hình nào.');
+  if (!all.length) throw new Error(t('Chưa có phiên ghi hình nào.'));
   return sessionDir(all[0]);
 }
 

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="vi">
+<html lang="__LANG__">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -134,6 +134,7 @@
       <button data-tab="settings">Cài đặt</button>
     </nav>
     <span id="pill" class="pill">Đang kết nối</span>
+    <button id="lang-btn" class="btn small" data-no-i18n title="Đổi ngôn ngữ / Switch language"></button>
     <div style="position: relative">
       <button id="bell" class="btn small" title="Thông báo" aria-label="Thông báo">🔔 <span id="bell-count" class="pill err plain" style="padding:0 7px;font-size:.78rem" hidden></span></button>
       <div id="bell-panel" class="card" hidden style="position:absolute;right:0;top:44px;width:min(380px,92vw);max-height:70vh;overflow:auto;z-index:10;padding:14px">
@@ -344,6 +345,47 @@
 
 <script>
 const TOKEN = '__TOKEN__';
+/* ── Song ngữ: máy chủ chèn từ điển của ngôn ngữ đang chọn. Khoá là câu tiếng Việt nguyên văn; {x} là chỗ chèn giá trị. ── */
+const I18N = __I18N__;
+const LOCALE = I18N.lang === 'en' ? 'en-GB' : 'vi-VN';
+const hasKey = (k) => !!I18N.dict && Object.prototype.hasOwnProperty.call(I18N.dict, k);
+function t(text, vars) {
+  let r = hasKey(text) ? I18N.dict[text] : text;
+  if (vars) r = r.replace(/\{(\w+)\}/g, (m, k) => (Object.prototype.hasOwnProperty.call(vars, k) ? String(vars[k]) : m));
+  return r;
+}
+/* Chữ cố định trong trang (và các đoạn HTML dựng sau) được dịch tự động: nút, nhãn, gợi ý trong ô nhập...
+   Câu có chèn giá trị thì gọi t() trong mã. Không đụng nội dung buổi học (tóm tắt, phiên âm, nhật ký). */
+const I18N_ATTRS = ['placeholder', 'title', 'aria-label', 'alt'];
+const skipI18n = (el) => !!(el && el.closest && el.closest('.doc, pre, textarea, [data-no-i18n]'));
+function translateText(node) {
+  const raw = node.data, key = raw.trim();
+  if (!key || !hasKey(key) || skipI18n(node.parentElement)) return;
+  // Chỉ ghi khi chữ thực sự đổi: ghi lại y nguyên vẫn sinh sự kiện thay đổi, gây vòng lặp vô hạn.
+  if (I18N.dict[key] !== key) node.data = raw.replace(key, I18N.dict[key]);
+}
+function translateTree(root) {
+  if (root.nodeType === 3) return translateText(root);
+  if (root.nodeType !== 1 || skipI18n(root)) return;
+  const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n = walk.nextNode(); n; n = walk.nextNode()) translateText(n);
+  for (const el of [root, ...root.querySelectorAll('[placeholder],[title],[aria-label],[alt]')]) {
+    for (const a of I18N_ATTRS) {
+      const v = el.getAttribute(a);
+      if (v && hasKey(v.trim()) && I18N.dict[v.trim()] !== v.trim()) el.setAttribute(a, I18N.dict[v.trim()]);
+    }
+  }
+}
+if (I18N.lang === 'en') {
+  translateTree(document.body);
+  new MutationObserver((list) => {
+    for (const m of list) {
+      if (m.type === 'characterData') translateText(m.target);
+      else if (m.type === 'attributes') translateTree(m.target);
+      else m.addedNodes.forEach(translateTree);
+    }
+  }).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: I18N_ATTRS });
+}
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -352,7 +394,7 @@ async function api(path, body) {
   const res = await fetch(path, body === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json', 'x-classrec-token': TOKEN }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
   if (res.status === 401) location.href = '/login'; // phiên đăng nhập hết hạn (khi dùng từ xa)
-  if (!res.ok) throw new Error(data.error || `Lỗi ${res.status}`);
+  if (!res.ok) throw new Error(data.error || t('Lỗi {code}', { code: res.status }));
   return data;
 }
 
@@ -366,20 +408,31 @@ function toast(msg, isErr) {
 }
 const fail = (e) => toast(e.message, true);
 
-const PHASE = {
+/* Nút đổi ngôn ngữ: lưu vào cài đặt (áp dụng cho cả thông báo, nhật ký của bot) rồi tải lại trang. */
+$('#lang-btn').textContent = I18N.lang === 'en' ? 'Tiếng Việt' : 'English';
+$('#lang-btn').onclick = async () => {
+  try {
+    await api('/api/lang', { lang: I18N.lang === 'en' ? 'vi' : 'en' });
+    location.reload();
+  } catch (e) {
+    fail(e);
+  }
+};
+
+const PHASE = Object.fromEntries(Object.entries({
   starting: 'Đang khởi động', waiting_open: 'Chờ phòng mở', joining: 'Đang vào phòng', waiting_admit: 'Chờ được duyệt vào',
   recording: 'Đang ghi', grace: 'Phòng đã đóng, chờ đổi phòng', finalizing: 'Đang xử lý file', done: 'Hoàn tất', error: 'Kết thúc có lỗi', unknown: 'Không rõ',
-};
+}).map(([k, v]) => [k, t(v)]));
 const STEP = { starting: 0, waiting_open: 0, joining: 1, waiting_admit: 1, recording: 2, grace: 2, finalizing: 3, done: 4, error: 4 };
-const PLATFORM = { zoom: 'Zoom', meet: 'Google Meet', mock: 'Phòng giả lập' };
+const PLATFORM = { zoom: 'Zoom', meet: 'Google Meet', mock: t('Phòng giả lập') };
 const pillClass = (p) => (p === 'recording' ? 'rec' : p === 'done' ? 'ok' : p === 'error' ? 'err' : p === 'grace' ? 'warn' : '');
 
 function fmtDur(sec) {
   sec = Math.max(0, Math.round(sec || 0));
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
-  if (h) return `${h} giờ ${m} phút`;
-  if (m) return `${m} phút ${s} giây`;
-  return `${s} giây`;
+  if (h) return t('{h} giờ {m} phút', { h, m });
+  if (m) return t('{m} phút {s} giây', { m, s });
+  return t('{s} giây', { s });
 }
 function fmtDate(iso) {
   if (!iso) return '';
@@ -412,7 +465,7 @@ async function tick() {
     state.running = run; // các phần còn lại của giao diện làm việc với buổi đang được chọn
     const pill = $('#pill');
     pill.className = 'pill ' + (all.length ? pillClass((run || all[0]).phase) : 'ok');
-    pill.textContent = all.length > 1 ? `Đang ghi ${all.length} lớp` : all.length ? PHASE[all[0].phase] || all[0].phase : 'Sẵn sàng';
+    pill.textContent = all.length > 1 ? t('Đang ghi {n} lớp', { n: all.length }) : all.length ? PHASE[all[0].phase] || all[0].phase : t('Sẵn sàng');
     renderRunTabs(all, canAdd);
 
     if (all.length) delay = 2000;
@@ -421,7 +474,7 @@ async function tick() {
     prevRunningIds = all.map((s) => s.id);
     if (ended.length) {
       const done = state.sessions.find((s) => s.id === ended[0]);
-      toast(`Buổi ghi "${done ? done.title : ''}" đã kết thúc.`);
+      toast(t('Buổi ghi "{title}" đã kết thúc.', { title: done ? done.title : '' }));
       if (!all.length) {
         selectSession(ended[0]);
         switchTab('sessions');
@@ -434,7 +487,7 @@ async function tick() {
     if (!run) renderAttention(null);
     renderKeyWarn();
     renderBell(state.notifications || []);
-    if (state.server && state.server.diskFree != null) $("#disk-free").textContent = `Đĩa còn trống: ${(state.server.diskFree / 1e9).toFixed(1)} GB`;
+    if (state.server && state.server.diskFree != null) $("#disk-free").textContent = t('Đĩa còn trống: {gb} GB', { gb: (state.server.diskFree / 1e9).toFixed(1) });
     renderLast();
     renderList();
     if (selectedId && !state.sessions.some((s) => s.id === selectedId)) {
@@ -480,11 +533,11 @@ function renderLive(d) {
   $('#l-platform').textContent = PLATFORM[d.platform] || d.platform || '…';
   $('#l-start').textContent = fmtDate(d.startedAt);
   $('#l-elapsed').textContent = fmtDur((Date.now() - new Date(d.startedAt).getTime()) / 1000);
-  $('#l-seg').textContent = d.phase === 'recording' ? `${d.segments} (đang ghi đoạn ${d.segments + 1})` : String(d.segments);
+  $('#l-seg').textContent = d.phase === 'recording' ? t('{n} (đang ghi đoạn {next})', { n: d.segments, next: d.segments + 1 }) : String(d.segments);
   $('#l-url').textContent = d.url || '';
   const recording = d.phase === 'recording';
   const silent = d.audio ? d.audio.silentSeconds : null;
-  $('#l-audio').textContent = !recording || silent === null ? '…' : silent < 20 ? 'Đang có tiếng' : `Im lặng ${fmtDur(silent)}`;
+  $('#l-audio').textContent = !recording || silent === null ? '…' : silent < 20 ? t('Đang có tiếng') : t('Im lặng {time}', { time: fmtDur(silent) });
   $('#l-people').textContent = recording && d.participants !== null ? String(d.participants) : '…';
   renderAttention(d);
   // Đang xử lý file: bot đã rời phòng, nên ẩn phần đổi phòng / dừng ghi và ảnh màn hình.
@@ -503,7 +556,7 @@ function renderLive(d) {
     img.hidden = !src;
     $('#l-shot-none').hidden = !!src;
     if (src) img.src = src;
-    $('#l-shot-time').textContent = d.liveAt ? `Chụp lúc ${new Date(d.liveAt).toLocaleTimeString('vi-VN')}, cập nhật mỗi 10 giây.` : src ? 'Ảnh chụp lúc bot đổi trạng thái gần nhất.' : '';
+    $('#l-shot-time').textContent = d.liveAt ? t('Chụp lúc {time}, cập nhật mỗi 10 giây.', { time: new Date(d.liveAt).toLocaleTimeString(LOCALE) }) : src ? 'Ảnh chụp lúc bot đổi trạng thái gần nhất.' : '';
   }
 }
 
@@ -564,16 +617,16 @@ function renderCalendarStatus(c) {
     box.innerHTML = '<span class="muted">Muốn tự tạo lịch từ Google Calendar? Dán "địa chỉ bí mật iCal" ở tab Cài đặt, mục Lịch Google.</span>';
     return;
   }
-  const when = c.at ? new Date(c.at).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '';
+  const when = c.at ? new Date(c.at).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' }) : '';
   box.innerHTML = c.error
-    ? `<span class="pill err plain">Lịch Google: ${esc(c.error)}</span>`
-    : `<span class="pill ok plain">Lịch Google: đã đồng bộ${when ? ' lúc ' + esc(when) : ''} · ${c.events ?? 0} buổi sắp tới</span>`;
+    ? `<span class="pill err plain">${esc(t('Lịch Google: {error}', { error: c.error }))}</span>`
+    : `<span class="pill ok plain">${esc(when ? t('Lịch Google: đã đồng bộ lúc {time} · {n} buổi sắp tới', { time: when, n: c.events ?? 0 }) : t('Lịch Google: đã đồng bộ · {n} buổi sắp tới', { n: c.events ?? 0 }))}</span>`;
   box.insertAdjacentHTML('beforeend', '<button class="btn small" id="btn-cal-sync">Đồng bộ ngay</button>');
   $('#btn-cal-sync').onclick = async () => {
     try {
       const r = await api('/api/calendar-sync', {});
       if (r.calendar.error) fail(new Error(r.calendar.error));
-      else toast(`Đã đồng bộ: thêm ${r.calendar.added}, sửa ${r.calendar.updated}, gỡ ${r.calendar.removed}.`);
+      else toast(t('Đã đồng bộ: thêm {added}, sửa {updated}, gỡ {removed}.', r.calendar));
       await loadSchedules();
     } catch (e) {
       fail(e);
@@ -582,19 +635,19 @@ function renderCalendarStatus(c) {
 }
 
 /* ───────────── Lịch ghi tự động ───────────── */
-const DAY_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'];
+const DAY_NAMES = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'].map((d) => t(d));
 async function loadSchedules() {
   const { schedules, now, tz, calendar } = await api('/api/schedules');
   renderCalendarStatus(calendar);
-  $('#sched-clock').textContent = `${new Date(now).toLocaleString('vi-VN', { weekday: 'short', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })} (${tz})`;
+  $('#sched-clock').textContent = `${new Date(now).toLocaleString(LOCALE, { weekday: 'short', hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' })} (${tz})`;
   const box = $('#sched-list');
   if (!schedules.length) return void (box.innerHTML = '<p class="muted">Chưa có lịch nào.</p>');
   box.innerHTML = schedules
     .map((s) => {
-      const when = s.date ? `ngày ${s.date.split('-').reverse().join('/')}` : [1, 2, 3, 4, 5, 6, 0].filter((d) => s.days.includes(d)).map((d) => DAY_NAMES[d]).join(', ');
+      const when = s.date ? t('ngày {date}', { date: s.date.split('-').reverse().join('/') }) : [1, 2, 3, 4, 5, 6, 0].filter((d) => s.days.includes(d)).map((d) => DAY_NAMES[d]).join(', ');
       return `<div class="head" style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px">
-        <div style="min-width:0"><strong>${esc(s.title)}</strong>${s.source === "calendar" ? " <span class=\"pill plain\" style=\"font-size:.75rem;padding:0 8px\">từ lịch Google</span>" : ""} · ${esc(s.time)} · ${esc(when)}${s.summary ? '' : ' · chỉ video'}
-          <div class="muted" style="font-size:.85rem;overflow-wrap:anywhere">${esc(s.url)}${s.lastFired ? ` · chạy gần nhất: ${esc(s.lastFired.split('-').reverse().join('/'))}` : ''}</div></div>
+        <div style="min-width:0"><strong>${esc(s.title)}</strong>${s.source === "calendar" ? " <span class=\"pill plain\" style=\"font-size:.75rem;padding:0 8px\">từ lịch Google</span>" : ""} · ${esc(s.time)} · ${esc(when)}${s.summary ? '' : ' · ' + esc(t('chỉ video'))}
+          <div class="muted" style="font-size:.85rem;overflow-wrap:anywhere">${esc(s.url)}${s.lastFired ? ' · ' + esc(t('chạy gần nhất: {date}', { date: s.lastFired.split('-').reverse().join('/') })) : ''}</div></div>
         <div class="actions">
           <label class="check" style="margin:0"><input type="checkbox" data-sched-toggle="${esc(s.id)}" ${s.enabled ? 'checked' : ''}> Bật</label>
           <button class="btn small danger" data-sched-del="${esc(s.id)}">Xoá</button>
@@ -603,7 +656,7 @@ async function loadSchedules() {
     .join('');
   $$('[data-sched-toggle]', box).forEach((el) => (el.onchange = () => api('/api/schedules/toggle', { id: el.dataset.schedToggle, enabled: el.checked }).catch(fail)));
   $$('[data-sched-del]', box).forEach((el) => (el.onclick = async () => {
-    if (!confirm('Xoá lịch ghi này?')) return;
+    if (!confirm(t('Xoá lịch ghi này?'))) return;
     try {
       await api('/api/schedules/delete', { id: el.dataset.schedDel });
       await loadSchedules();
@@ -632,20 +685,20 @@ $('#btn-sched-add').onclick = async () => {
 
 /* Bot cần người dùng quyết định (đang một mình trong phòng, hoặc phòng im lặng hoàn toàn). */
 let lastAttnKey = null;
-const clock = (iso) => new Date(iso).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+const clock = (iso) => new Date(iso).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit' });
 function renderAttention(d) {
   const a = d && d.attention;
   const box = $('#l-attn');
   box.hidden = !a;
-  document.title = a ? '⚠ Bot cần bạn quyết định — Class Recorder' : 'Class Recorder';
+  document.title = a ? t('⚠ Bot cần bạn quyết định — Class Recorder') : 'Class Recorder';
   if (!a) return void (lastAttnKey = null);
   const alone = a.reason === 'alone';
-  const title = alone ? 'Bot đang ở một mình trong phòng' : 'Phòng im lặng hoàn toàn';
+  const title = alone ? t('Bot đang ở một mình trong phòng') : t('Phòng im lặng hoàn toàn');
   const mins = Math.max(1, Math.round((Date.now() - new Date(a.since).getTime()) / 60000));
   $('#l-attn-title').textContent = title;
   $('#l-attn-text').textContent =
-    `${alone ? 'Mọi người đã rời phòng' : 'Không còn ai phát ra tiếng'} từ ${clock(a.since)} (khoảng ${mins} phút), có vẻ lớp đã tan. Bạn muốn dừng ghi hay chờ tiếp?` +
-    (a.autoEndAt ? ` Nếu bạn không chọn, bot tự dừng và xuất file lúc ${clock(a.autoEndAt)}.` : '');
+    t(alone ? 'Mọi người đã rời phòng từ {time} (khoảng {mins} phút), có vẻ lớp đã tan. Bạn muốn dừng ghi hay chờ tiếp?' : 'Không còn ai phát ra tiếng từ {time} (khoảng {mins} phút), có vẻ lớp đã tan. Bạn muốn dừng ghi hay chờ tiếp?', { time: clock(a.since), mins }) +
+    (a.autoEndAt ? ' ' + t('Nếu bạn không chọn, bot tự dừng và xuất file lúc {time}.', { time: clock(a.autoEndAt) }) : '');
   const key = `${d.id}|${a.reason}|${a.since}`;
   if (key !== lastAttnKey) {
     lastAttnKey = key;
@@ -653,7 +706,7 @@ function renderAttention(d) {
     // Thông báo trên màn hình máy tính, phòng khi bạn đang ở cửa sổ khác.
     if ('Notification' in window && Notification.permission === 'granted') {
       try {
-        const n = new Notification('Class Recorder: ' + title, { body: `Buổi "${d.title}": dừng ghi hay chờ tiếp? Mở Class Recorder để chọn.`, tag: 'classrec-attn', requireInteraction: true });
+        const n = new Notification('Class Recorder: ' + title, { body: t('Buổi "{title}": dừng ghi hay chờ tiếp? Mở Class Recorder để chọn.', { title: d.title }), tag: 'classrec-attn', requireInteraction: true });
         n.onclick = () => { window.focus(); n.close(); };
       } catch (e) { /* trình duyệt không cho hiện thông báo */ }
     }
@@ -707,7 +760,7 @@ function renderLast() {
   if (box.dataset.sig === sig) return;
   box.dataset.sig = sig;
   box.innerHTML = `
-    <div class="head"><h2>Buổi gần nhất: ${esc(s.title)}</h2><span class="pill ${pillClass(s.phase)}">${esc(PHASE[s.phase] || s.phase)}</span></div>
+    <div class="head"><h2>${esc(t('Buổi gần nhất: {title}', { title: s.title }))}</h2><span class="pill ${pillClass(s.phase)}">${esc(PHASE[s.phase] || s.phase)}</span></div>
     <p class="muted" style="margin: 0 0 14px">${esc(fmtDate(s.startedAt))}${s.durationSeconds ? ' · ' + esc(fmtDur(s.durationSeconds)) : ''}${s.message ? ' · ' + esc(s.message) : ''}</p>
     <button class="btn" id="btn-open-last">Xem video và tóm tắt</button>`;
   $('#btn-open-last').onclick = () => {
@@ -749,7 +802,7 @@ $('#btn-rejoin').onclick = async () => {
   }
 };
 $('#btn-stop').onclick = async () => {
-  if (!confirm(`Dừng ghi "${state.running ? state.running.title : ''}" ngay và xuất file?`)) return;
+  if (!confirm(t('Dừng ghi "{title}" ngay và xuất file?', { title: state.running ? state.running.title : '' }))) return;
   try {
     await api('/api/stop', { id: viewId });
     toast('Đã gửi lệnh dừng. Bot đang xuất file.');
@@ -773,7 +826,7 @@ function renderList() {
   box.innerHTML = state.sessions
     .map((s) => `<button data-id="${esc(s.id)}" class="${s.id === selectedId ? 'on' : ''}">
         <span class="t">${esc(s.title)}</span>
-        <span class="d">${esc(fmtDate(s.startedAt) || s.id)}${s.durationSeconds ? ' · ' + esc(fmtDur(s.durationSeconds)) : ''} · ${esc(s.running ? 'đang chạy' : PHASE[s.phase] || s.phase)}</span>
+        <span class="d">${esc(fmtDate(s.startedAt) || s.id)}${s.durationSeconds ? ' · ' + esc(fmtDur(s.durationSeconds)) : ''} · ${esc(s.running ? t('đang chạy') : PHASE[s.phase] || s.phase)}</span>
       </button>`)
     .join('');
   $$('button', box).forEach((b) => (b.onclick = () => selectSession(b.dataset.id)));
@@ -803,7 +856,7 @@ async function refreshDetail() {
     <p class="muted" style="margin: 0 0 14px">${esc(fmtDate(d.startedAt))}${d.durationSeconds ? ' · ' + esc(fmtDur(d.durationSeconds)) : ''}${d.platform ? ' · ' + esc(PLATFORM[d.platform] || d.platform) : ''}${d.message && !d.running ? ' · ' + esc(d.message) : ''}</p>
     ${instructorHtml(d)}
     ${d.notes.map((n) => `<p class="note warn">${esc(n)}</p>`).join('')}
-    ${rec ? `<video id="player" controls preload="metadata" src="/files/${esc(d.id)}/${esc(rec)}"></video>` : d.running ? '<p class="note info">Buổi này đang chạy. Video xuất hiện ở đây khi buổi ghi kết thúc.</p>' : d.videoRemoved ? `<p class="note info">Video đã được tự dọn ngày ${esc(fmtDate(d.videoRemoved))} để tiết kiệm dung lượng; phiên âm và tóm tắt vẫn còn.</p>` : '<p class="note warn">Buổi này không có video.</p>'}
+    ${rec ? `<video id="player" controls preload="metadata" src="/files/${esc(d.id)}/${esc(rec)}"></video>` : d.running ? '<p class="note info">Buổi này đang chạy. Video xuất hiện ở đây khi buổi ghi kết thúc.</p>' : d.videoRemoved ? `<p class="note info">${esc(t('Video đã được tự dọn ngày {date} để tiết kiệm dung lượng; phiên âm và tóm tắt vẫn còn.', { date: fmtDate(d.videoRemoved) }))}</p>` : '<p class="note warn">Buổi này không có video.</p>'}
     <div class="subtabs">
       <button data-sub="summary">Tóm tắt</button><button data-sub="transcript">Phiên âm</button><button data-sub="log">Nhật ký</button>
     </div>
@@ -820,7 +873,7 @@ async function refreshDetail() {
     <pre id="process-out" class="log" hidden></pre>`;
   $$('.subtabs button', box).forEach((b) => (b.onclick = () => showSub(b.dataset.sub, d)));
   if ($('#btn-instr')) $('#btn-instr').onclick = async () => {
-    const name = prompt('Tên giảng viên của buổi này (để trống để xoá):', d.instructor || '');
+    const name = prompt(t('Tên giảng viên của buổi này (để trống để xoá):'), d.instructor || '');
     if (name === null) return;
     try {
       await api('/api/session-meta', { id: d.id, instructor: name });
@@ -834,7 +887,7 @@ async function refreshDetail() {
   if ($('#btn-folder')) $('#btn-folder').onclick = () => api('/api/open-folder', { id: d.id }).catch(fail);
   $('#btn-process').onclick = () => runProcess(d.id);
   if ($('#btn-delete')) $('#btn-delete').onclick = async () => {
-    if (!confirm(`Xoá hẳn buổi "${d.title}"?\nVideo, bản phiên âm và bản tóm tắt của buổi này sẽ mất, không khôi phục được.`)) return;
+    if (!confirm(t('Xoá hẳn buổi "{title}"?', { title: d.title }) + '\n' + t('Video, bản phiên âm và bản tóm tắt của buổi này sẽ mất, không khôi phục được.'))) return;
     try {
       await api('/api/delete-session', { id: d.id });
       toast('Đã xoá buổi ghi.');
@@ -874,7 +927,7 @@ async function showSub(name, d) {
   body.style.whiteSpace = '';
   const file = name === 'summary' ? d.files.summary : d.files.transcript;
   if (!file) {
-    body.innerHTML = `<p class="muted">${name === 'summary' ? 'Buổi này chưa có bản tóm tắt.' : 'Buổi này chưa có bản phiên âm.'} Kiểm tra API key ở tab Cài đặt rồi bấm "Phiên âm và tóm tắt lại".</p>`;
+    body.innerHTML = `<p class="muted">${esc(t(name === 'summary' ? 'Buổi này chưa có bản tóm tắt.' : 'Buổi này chưa có bản phiên âm.'))} ${esc(t('Kiểm tra API key ở tab Cài đặt rồi bấm "Phiên âm và tóm tắt lại".'))}</p>`;
     return;
   }
   try {
@@ -882,7 +935,7 @@ async function showSub(name, d) {
     body.className = 'doc';
     body.innerHTML = name === 'summary' ? markdown(text) : text.split(/\n\s*\n/).filter((p) => p.trim()).map((p) => `<p>${linkTimes(esc(p.trim()))}</p>`).join('');
   } catch (e) {
-    body.innerHTML = `<p class="note err">Không đọc được file: ${esc(e.message)}</p>`;
+    body.innerHTML = `<p class="note err">${esc(t('Không đọc được file: {error}', { error: e.message }))}</p>`;
   }
 }
 
@@ -892,9 +945,9 @@ function instructorHtml(d) {
   if (d.running) return '';
   const top = d.speakers ? Object.entries(d.speakers).slice(0, 5).map(([n, sec]) => `${esc(n)} ${fmtDur(sec)}`).join(' · ') : '';
   const who = d.instructor
-    ? `<strong>Giảng viên: ${esc(d.instructor)}</strong>${d.instructorAuto ? ' <span class="muted">(bot đoán theo người nói nhiều nhất)</span>' : ''}`
+    ? `<strong>${esc(t('Giảng viên: {name}', { name: d.instructor }))}</strong>${d.instructorAuto ? ' <span class="muted">' + esc(t('(bot đoán theo người nói nhiều nhất)')) + '</span>' : ''}`
     : `<span class="muted">${d.speakers ? 'Chưa đủ dữ liệu để đoán giảng viên.' : 'Chưa có tên giảng viên.'}</span>`;
-  return `<div class="head" style="margin:-4px 0 12px"><div>${who}${top ? `<div class="help">Thời gian nói: ${top}</div>` : ''}</div><button class="btn small" id="btn-instr">${d.instructor ? 'Sửa' : 'Đặt tên'}</button></div>`;
+  return `<div class="head" style="margin:-4px 0 12px"><div>${who}${top ? `<div class="help">${esc(t('Thời gian nói:'))} ${top}</div>` : ''}</div><button class="btn small" id="btn-instr">${d.instructor ? 'Sửa' : 'Đặt tên'}</button></div>`;
 }
 
 /* ───────────── Hỏi đáp về các buổi học ───────────── */
@@ -938,8 +991,8 @@ $('#btn-search').onclick = async () => {
   out.innerHTML = '<p class="muted">Đang tìm…</p>';
   try {
     const r = await api('/api/search', { q });
-    if (!r.results.length) return void (out.innerHTML = `<p class="muted">Không thấy "${esc(r.query)}" trong buổi nào.</p>`);
-    out.innerHTML = `<p class="muted" style="margin:0 0 8px">${r.total} kết quả trong ${r.results.length} buổi</p>` + r.results.map((s) => `
+    if (!r.results.length) return void (out.innerHTML = `<p class="muted">${esc(t('Không thấy "{q}" trong buổi nào.', { q: r.query }))}</p>`);
+    out.innerHTML = `<p class="muted" style="margin:0 0 8px">${esc(t('{n} kết quả trong {s} buổi', { n: r.total, s: r.results.length }))}</p>` + r.results.map((s) => `
       <div style="border-top:1px solid var(--border);padding:10px 0">
         <a href="#" class="ts" data-sid="${esc(s.id)}" data-st="">${esc(s.title)}</a> <span class="muted" style="font-size:.85rem">${esc(fmtDate(s.startedAt))}</span>
         ${s.hits.map((h) => `<div style="margin-top:6px;font-size:.93rem;overflow-wrap:anywhere">
@@ -1055,7 +1108,7 @@ function fieldHtml(f) {
   if (f.type === 'bool') return `<label class="check"><input type="checkbox" id="${id}" ${f.value === 'true' ? 'checked' : ''}> <span>${esc(f.label)}${help}</span></label>`;
   if (f.type === 'select') return `<label>${esc(f.label)}<select id="${id}">${f.options.map(([v, t]) => `<option value="${esc(v)}" ${v === f.value ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>${help}</label>`;
   if (f.type === 'secret') {
-    return `<label>${esc(f.label)} <span class="pill plain ${f.isSet ? 'ok' : 'warn'}" style="font-size:.8rem">${f.isSet ? 'Đã lưu, kết thúc bằng …' + esc(f.hint) : 'Chưa đặt'}</span>
+    return `<label>${esc(f.label)} <span class="pill plain ${f.isSet ? 'ok' : 'warn'}" style="font-size:.8rem">${f.isSet ? esc(t('Đã lưu, kết thúc bằng …{hint}', { hint: f.hint })) : esc(t('Chưa đặt'))}</span>
       <span class="secret"><input type="password" id="${id}" autocomplete="new-password" placeholder="${f.isSet ? 'Để trống nếu không đổi' : 'Dán API key vào đây'}">${f.isSet ? `<button type="button" class="btn small" data-clear="${esc(f.key)}">Xoá key</button>` : ''}</span>${help}</label>`;
   }
   return `<label>${esc(f.label)}<input type="${f.type === 'number' ? 'number' : 'text'}" id="${id}" value="${esc(f.value)}" ${f.type === 'number' ? 'step="any"' : ''} ${f.min !== null ? `min="${f.min}"` : ''} ${f.max !== null ? `max="${f.max}"` : ''}>${help}</label>`;
@@ -1080,7 +1133,7 @@ async function loadSettings() {
     $('#s-STT_BASE_URL').value = p[1];
     $('#s-STT_MODEL').value = p[2];
     markDirty();
-    toast(`Đã điền địa chỉ và model của ${p[0]}. Nhớ dán API key của dịch vụ này rồi bấm Lưu.`);
+    toast(t('Đã điền địa chỉ và model của {name}. Nhớ dán API key của dịch vụ này rồi bấm Lưu.', { name: t(p[0]) }));
   }));
   if ($('#preset-backup-groq')) $('#preset-backup-groq').onclick = () => {
     $('#s-STT_BACKUP_BASE_URL').value = 'https://api.groq.com/openai/v1';
@@ -1178,7 +1231,7 @@ $$('[data-tool]').forEach((b) => (b.onclick = async () => {
   }
   try {
     const { job } = await api('/api/tool', { name: b.dataset.tool });
-    await watchJob(job, $('#tool-out'), (j) => toast(j.code === 0 ? `${j.label}: xong.` : `${j.label}: có lỗi, xem chi tiết bên dưới.`, j.code !== 0));
+    await watchJob(job, $('#tool-out'), (j) => toast(t(j.code === 0 ? '{label}: xong.' : '{label}: có lỗi, xem chi tiết bên dưới.', { label: j.label }), j.code !== 0));
   } catch (e) {
     fail(e);
   }

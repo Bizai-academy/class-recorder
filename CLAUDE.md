@@ -22,4 +22,4 @@ Luôn trả lời bằng tiếng Việt. Bot tự vào lớp Zoom/Google Meet, g
 - Có: ghi song song tối đa MAX_PARALLEL lớp (mặc định 2; mỗi lớp một hồ sơ trình duyệt default/lop2/lop3; test/parallel-check.mjs), tìm kiếm toàn văn (src/search.js), tự dọn buổi cũ + cảnh báo đĩa (src/cleanup.js), đồng bộ Google Calendar qua iCal (src/calendar.js), hỏi đáp về các buổi đã ghi (src/ask.js), đoán giảng viên theo người nói lâu nhất (src/speakers.js — chưa kiểm chứng trên Zoom/Meet thật), lịch ghi tự động, thông báo trên trình duyệt (chuông 🔔), xoá buổi ghi, đổi mật khẩu, cảnh báo bot còn một mình, cắt đuôi phòng trống.
 
 ## Đóng gói
-- Bản Windows: `node scripts/build-windows.mjs` → `dist/` (thư mục chạy ngay + zip; có Inno Setup thì ra thêm file cài đặt). `src/remote-login.js` không nằm trong git và không được đóng gói.
+- Đóng gói: `node scripts/build.mjs` dựng gói cho hệ điều hành đang chạy (Windows: zip + file cài Inno Setup; macOS: zip; Linux: tar.gz) vào `dist/`. Ba hệ cùng lúc: GitHub Actions `.github/workflows/release.yml` (chạy khi đẩy tag `v*`). `src/remote-login.js` không nằm trong git và không được đóng gói.

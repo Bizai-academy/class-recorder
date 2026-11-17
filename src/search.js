@@ -1,3 +1,4 @@
+import { t } from './i18n.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { listSessions, sessionDir, readStatus } from './control.js';
@@ -52,8 +53,8 @@ function snippets(text, needle, { source, max }) {
 
 export function searchSessions(query, { perSession = 5, maxSessions = 30 } = {}) {
   const q = String(query || '').replace(/\s+/g, ' ').trim();
-  if (q.length < 2) throw new Error('Nhập ít nhất 2 ký tự để tìm.');
-  if (q.length > 100) throw new Error('Từ khoá quá dài.');
+  if (q.length < 2) throw new Error(t('Nhập ít nhất 2 ký tự để tìm.'));
+  if (q.length > 100) throw new Error(t('Từ khoá quá dài.'));
   const needle = fold(q);
   const results = [];
   let total = 0;

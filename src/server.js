@@ -17,6 +17,7 @@ import { askSessions } from './ask.js';
 import { searchSessions } from './search.js';
 import { cleanupOldSessions, diskFree } from './cleanup.js';
 import { syncCalendar } from './calendar.js';
+import { t, getLang, setLang, dictionaryFor } from './i18n.js';
 
 let calendarState = { configured: false };
 let calendarSyncNow = async () => calendarState;
@@ -61,12 +62,12 @@ function freeProfile() {
 
 function startSession({ url, title, passcode, name, summary }) {
   const profile = freeProfile();
-  if (!profile) throw new Error('Đã đủ số buổi ghi cùng lúc.');
-  const t = String(title || '').trim() || 'Buổi học';
-  const id = `${stamp()}-${slugify(t)}`;
+  if (!profile) throw new Error(t('Đã đủ số buổi ghi cùng lúc.'));
+  const ttl = String(title || '').trim() || t('Buổi học');
+  const id = `${stamp()}-${slugify(ttl)}`;
   const dir = sessionDir(id);
   fs.mkdirSync(dir, { recursive: true });
-  const args = [CLI, 'start', url, '--title', t, '--session-id', id, '--profile', profile];
+  const args = [CLI, 'start', url, '--title', ttl, '--session-id', id, '--profile', profile];
   recentStarts.set(id, { profile, at: Date.now() });
   if (passcode) args.push('--passcode', String(passcode));
   if (name) args.push('--name', String(name));
@@ -173,7 +174,7 @@ const atCapacity = () => {
 const jobs = new Map();
 const jobChildren = new Map(); // tên việc → tiến trình, để dừng được việc đang chạy (vd phiên đăng nhập từ xa)
 function startJob(name, label, args) {
-  for (const j of jobs.values()) if (j.name === name && !j.done) throw new HttpError(409, `"${label}" đang chạy rồi.`);
+  for (const j of jobs.values()) if (j.name === name && !j.done) throw new HttpError(409, t('"{label}" đang chạy rồi.', { label }));
   const id = crypto.randomBytes(6).toString('hex');
   const job = { id, name, label, output: '', done: false, code: null };
   jobs.set(id, job);
@@ -201,7 +202,7 @@ function sendFile(req, res, file) {
   try {
     stat = fs.statSync(file);
   } catch {
-    throw new HttpError(404, 'Không tìm thấy file.');
+    throw new HttpError(404, t('Không tìm thấy file.'));
   }
   const type = TYPES[path.extname(file)] || 'application/octet-stream';
   const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
@@ -225,7 +226,7 @@ function readRaw(req) {
     let data = '';
     req.on('data', (d) => {
       data += d;
-      if (data.length > 200000) reject(new HttpError(413, 'Dữ liệu gửi lên quá lớn.'));
+      if (data.length > 200000) reject(new HttpError(413, t('Dữ liệu gửi lên quá lớn.')));
     });
     req.on('end', () => resolve(data));
     req.on('error', reject);
@@ -237,7 +238,7 @@ async function readBody(req) {
   try {
     return data ? JSON.parse(data) : {};
   } catch {
-    throw new HttpError(400, 'Dữ liệu gửi lên không hợp lệ.');
+    throw new HttpError(400, t('Dữ liệu gửi lên không hợp lệ.'));
   }
 }
 
@@ -258,7 +259,7 @@ export async function startServer({ port = 8787, open = true } = {}) {
   const hosts = { has: (h) => /^(127\.0\.0\.1|localhost)(:\d+)?$/.test(h) || publicHosts.has(h) };
   const authOn = !!config.uiPasswordHash;
   if (config.uiPublicHosts.length && !authOn) {
-    throw new Error('Đã khai báo tên miền công khai (UI_PUBLIC_HOSTS) nhưng chưa đặt mật khẩu. Chạy: node src/cli.js ui-access --public-host <tên-miền>');
+    throw new Error(t('Đã khai báo tên miền công khai (UI_PUBLIC_HOSTS) nhưng chưa đặt mật khẩu. Chạy: node src/cli.js ui-access --public-host <tên-miền>'));
   }
   // Mở thư mục bằng trình quản lý file chỉ có nghĩa khi giao diện chạy trên chính máy người dùng.
   const headless = process.platform === 'linux' && !process.env.DISPLAY;
@@ -266,6 +267,7 @@ export async function startServer({ port = 8787, open = true } = {}) {
 
   const routes = {
     'GET /api/state': () => ({
+      lang: getLang(),
       running: runningSession(),
       runningAll: runningSessions(),
       maxParallel: maxParallel(),
@@ -285,6 +287,15 @@ export async function startServer({ port = 8787, open = true } = {}) {
 
     'GET /api/settings': () => ({ groups: readSettings() }),
 
+    // Đổi ngôn ngữ giao diện: ghi APP_LANG vào .env (tiến trình ghi hình mới tự đọc lại) và áp dụng ngay cho máy chủ.
+    'POST /api/lang': (body) => {
+      const lang = String(body.lang || '');
+      if (!['vi', 'en'].includes(lang)) throw new HttpError(400, t('Ngôn ngữ không hợp lệ.'));
+      writeEnv({ APP_LANG: lang });
+      setLang(lang);
+      return { lang };
+    },
+
     'POST /api/settings': (body) => {
       try {
         return { saved: saveSettings(body.values || {}) };
@@ -295,31 +306,31 @@ export async function startServer({ port = 8787, open = true } = {}) {
 
     'POST /api/start': (body) => {
       const url = String(body.url || '').trim();
-      if (!url) throw new HttpError(400, 'Hãy dán link phòng học.');
+      if (!url) throw new HttpError(400, t('Hãy dán link phòng học.'));
       try {
         pickPlatform(url);
       } catch (e) {
         throw new HttpError(400, e.message);
       }
-      if (atCapacity()) throw new HttpError(409, maxParallel() === 1 ? 'Đang có một buổi ghi chạy. Hãy dùng "Đổi phòng" hoặc dừng buổi đó trước.' : `Đang ghi đủ ${maxParallel()} buổi cùng lúc. Hãy chờ hoặc dừng bớt một buổi.`);
+      if (atCapacity()) throw new HttpError(409, maxParallel() === 1 ? t('Đang có một buổi ghi chạy. Hãy dùng "Đổi phòng" hoặc dừng buổi đó trước.') : t('Đang ghi đủ {n} buổi cùng lúc. Hãy chờ hoặc dừng bớt một buổi.', { n: maxParallel() }));
       return { id: startSession({ url, title: body.title, passcode: body.passcode, name: body.name, summary: body.summary }) };
     },
 
     // ── Xoá một buổi đã ghi (video, phiên âm, tóm tắt). Không hoàn tác được; giao diện hỏi lại trước khi gọi. ──
     'POST /api/delete-session': (body) => {
       const id = String(body.id || '');
-      if (!ID_RX.test(id) || !listSessions().includes(id)) throw new HttpError(404, 'Không tìm thấy buổi ghi.');
-      if (sessionInfo(id).running) throw new HttpError(409, 'Buổi này đang chạy — hãy dừng ghi trước.');
+      if (!ID_RX.test(id) || !listSessions().includes(id)) throw new HttpError(404, t('Không tìm thấy buổi ghi.'));
+      if (sessionInfo(id).running) throw new HttpError(409, t('Buổi này đang chạy — hãy dừng ghi trước.'));
       fs.rmSync(sessionDir(id), { recursive: true, force: true });
       return { ok: true };
     },
 
     // ── Đổi mật khẩu đăng nhập giao diện (chỉ khi giao diện đang bật đăng nhập). ──
     'POST /api/change-password': (body) => {
-      if (!authOn) throw new HttpError(400, 'Giao diện này không bật đăng nhập nên không có mật khẩu để đổi.');
-      if (!checkPassword(String(body.current || ''), config.uiPasswordHash)) throw new HttpError(403, 'Mật khẩu hiện tại không đúng.');
+      if (!authOn) throw new HttpError(400, t('Giao diện này không bật đăng nhập nên không có mật khẩu để đổi.'));
+      if (!checkPassword(String(body.current || ''), config.uiPasswordHash)) throw new HttpError(403, t('Mật khẩu hiện tại không đúng.'));
       const next = String(body.next || '');
-      if (next.length < 10) throw new HttpError(400, 'Mật khẩu mới cần ít nhất 10 ký tự.');
+      if (next.length < 10) throw new HttpError(400, t('Mật khẩu mới cần ít nhất 10 ký tự.'));
       const hash = hashPassword(next);
       writeEnv({ UI_PASSWORD_HASH: hash });
       config.uiPasswordHash = hash; // áp dụng ngay, không cần khởi động lại
@@ -344,14 +355,14 @@ export async function startServer({ port = 8787, open = true } = {}) {
     'POST /api/schedules/toggle': (body) => {
       const list = loadSchedules();
       const s = list.find((x) => x.id === body.id);
-      if (!s) throw new HttpError(404, 'Không tìm thấy lịch.');
+      if (!s) throw new HttpError(404, t('Không tìm thấy lịch.'));
       s.enabled = !!body.enabled;
       saveSchedules(list);
       return { ok: true };
     },
     'POST /api/schedules/delete': (body) => {
       const list = loadSchedules();
-      if (!list.some((x) => x.id === body.id)) throw new HttpError(404, 'Không tìm thấy lịch.');
+      if (!list.some((x) => x.id === body.id)) throw new HttpError(404, t('Không tìm thấy lịch.'));
       saveSchedules(list.filter((x) => x.id !== body.id));
       return { ok: true };
     },
@@ -368,7 +379,7 @@ export async function startServer({ port = 8787, open = true } = {}) {
     // Sửa tên giảng viên của một buổi (ghi đè tên bot đoán).
     'POST /api/session-meta': (body) => {
       const id = String(body.id || '');
-      if (!ID_RX.test(id) || !listSessions().includes(id)) throw new HttpError(404, 'Không tìm thấy buổi ghi.');
+      if (!ID_RX.test(id) || !listSessions().includes(id)) throw new HttpError(404, t('Không tìm thấy buổi ghi.'));
       const file = path.join(sessionDir(id), 'status.json');
       const s = JSON.parse(fs.readFileSync(file, 'utf8'));
       const name = String(body.instructor ?? '').replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -398,54 +409,54 @@ export async function startServer({ port = 8787, open = true } = {}) {
       try {
         pickPlatform(url);
       } catch (e) {
-        throw new HttpError(400, url ? e.message : 'Hãy dán link phòng mới.');
+        throw new HttpError(400, url ? e.message : t('Hãy dán link phòng mới.'));
       }
       const running = targetRunning(body);
-      if (!running) throw new HttpError(409, 'Không có buổi ghi nào đang chạy.');
+      if (!running) throw new HttpError(409, t('Không có buổi ghi nào đang chạy.'));
       sendCommand(sessionDir(running.id), { cmd: 'rejoin', url, ...(body.passcode ? { passcode: String(body.passcode) } : {}) });
       return { ok: true };
     },
 
     'POST /api/stop': (body) => {
       const running = targetRunning(body);
-      if (!running) throw new HttpError(409, 'Không có buổi ghi nào đang chạy.');
+      if (!running) throw new HttpError(409, t('Không có buổi ghi nào đang chạy.'));
       sendCommand(sessionDir(running.id), { cmd: 'stop' });
       return { ok: true };
     },
 
     'POST /api/keep': (body) => {
       const running = targetRunning(body);
-      if (!running) throw new HttpError(409, 'Không có buổi ghi nào đang chạy.');
+      if (!running) throw new HttpError(409, t('Không có buổi ghi nào đang chạy.'));
       sendCommand(sessionDir(running.id), { cmd: 'keep' });
       return { ok: true };
     },
 
     'POST /api/process': (body) => {
       const id = String(body.id || '');
-      if (!ID_RX.test(id) || !listSessions().includes(id)) throw new HttpError(404, 'Không tìm thấy buổi ghi.');
-      if (sessionInfo(id).running) throw new HttpError(409, 'Buổi này đang chạy.');
-      const job = startJob(`process:${id}`, 'Xử lý lại', [CLI, 'process', id]);
+      if (!ID_RX.test(id) || !listSessions().includes(id)) throw new HttpError(404, t('Không tìm thấy buổi ghi.'));
+      if (sessionInfo(id).running) throw new HttpError(409, t('Buổi này đang chạy.'));
+      const job = startJob(`process:${id}`, t('Xử lý lại'), [CLI, 'process', id]);
       return { job: job.id };
     },
 
     'POST /api/tool': (body) => {
       const tools = {
-        selftest: ['Tự kiểm thử', [CLI, 'selftest']],
-        stt: ['Kiểm tra phiên âm', [path.join(ROOT, 'test', 'stt-check.mjs')]],
-        summary: ['Kiểm tra tóm tắt', [path.join(ROOT, 'test', 'summary-check.mjs')]],
-        'setup-stt': ['Cài bộ phiên âm trên máy', [path.join(ROOT, 'scripts', 'setup-stt.mjs')]],
-        login: ['Đăng nhập tài khoản', [CLI, 'login']],
+        selftest: [t('Tự kiểm thử'), [CLI, 'selftest']],
+        stt: [t('Kiểm tra phiên âm'), [path.join(ROOT, 'test', 'stt-check.mjs')]],
+        summary: [t('Kiểm tra tóm tắt'), [path.join(ROOT, 'test', 'summary-check.mjs')]],
+        'setup-stt': [t('Cài bộ phiên âm trên máy'), [path.join(ROOT, 'scripts', 'setup-stt.mjs')]],
+        login: [t('Đăng nhập tài khoản'), [CLI, 'login']],
       };
-      const t = tools[body.name];
-      if (!t) throw new HttpError(400, 'Công cụ không tồn tại.');
-      if (!['stt', 'summary', 'setup-stt'].includes(body.name) && runningSession()) throw new HttpError(409, 'Đang có buổi ghi chạy — hãy chờ buổi đó xong (trình duyệt của bot đang bận).');
-      const job = startJob(body.name, t[0], t[1]);
+      const tool = tools[body.name];
+      if (!tool) throw new HttpError(400, t('Công cụ không tồn tại.'));
+      if (!['stt', 'summary', 'setup-stt'].includes(body.name) && runningSession()) throw new HttpError(409, t('Đang có buổi ghi chạy — hãy chờ buổi đó xong (trình duyệt của bot đang bận).'));
+      const job = startJob(body.name, tool[0], tool[1]);
       return { job: job.id };
     },
 
     'POST /api/open-folder': (body) => {
       const id = String(body.id || '');
-      if (!ID_RX.test(id) || !listSessions().includes(id)) throw new HttpError(404, 'Không tìm thấy buổi ghi.');
+      if (!ID_RX.test(id) || !listSessions().includes(id)) throw new HttpError(404, t('Không tìm thấy buổi ghi.'));
       openInOS(sessionDir(id));
       return { ok: true };
     },
@@ -459,7 +470,7 @@ export async function startServer({ port = 8787, open = true } = {}) {
     };
     try {
       // Chỉ phục vụ khi được gọi bằng đúng địa chỉ máy này (chặn trang web lạ trỏ tên miền về 127.0.0.1).
-      if (!hosts.has(String(req.headers.host || '').toLowerCase())) throw new HttpError(403, 'Địa chỉ không hợp lệ.');
+      if (!hosts.has(String(req.headers.host || '').toLowerCase())) throw new HttpError(403, t('Địa chỉ không hợp lệ.'));
       const url = new URL(req.url, `http://${req.headers.host}`);
       const p = decodeURIComponent(url.pathname);
 
@@ -475,12 +486,12 @@ export async function startServer({ port = 8787, open = true } = {}) {
         if (p === '/login' && req.method === 'GET') return page(200, loginPage());
         if (p === '/login' && req.method === 'POST') {
           const origin = req.headers.origin;
-          if (origin && !hosts.has(origin.replace(/^https?:\/\//, '').toLowerCase())) throw new HttpError(403, 'Nguồn yêu cầu không hợp lệ.');
-          if (!loginAllowed(ip)) return page(429, loginPage('Sai mật khẩu quá nhiều lần. Hãy thử lại sau 10 phút.'));
+          if (origin && !hosts.has(origin.replace(/^https?:\/\//, '').toLowerCase())) throw new HttpError(403, t('Nguồn yêu cầu không hợp lệ.'));
+          if (!loginAllowed(ip)) return page(429, loginPage(t('Sai mật khẩu quá nhiều lần. Hãy thử lại sau 10 phút.')));
           const form = new URLSearchParams(await readRaw(req));
           const ok = verifyPassword(form.get('password') || '', config.uiPasswordHash);
           recordLogin(ip, ok);
-          if (!ok) return page(401, loginPage('Mật khẩu không đúng.'));
+          if (!ok) return page(401, loginPage(t('Mật khẩu không đúng.')));
           res.writeHead(303, { Location: '/', 'Set-Cookie': sessionCookie({ secure: viaHttps }) });
           return res.end();
         }
@@ -493,21 +504,21 @@ export async function startServer({ port = 8787, open = true } = {}) {
             res.writeHead(303, { Location: '/login' });
             return res.end();
           }
-          throw new HttpError(401, 'Chưa đăng nhập.');
+          throw new HttpError(401, t('Chưa đăng nhập.'));
         }
       }
 
       if (req.method === 'POST') {
         // Thao tác thay đổi dữ liệu phải kèm mã bí mật của trang — trang web khác không thể giả lệnh.
-        if (req.headers['x-classrec-token'] !== token) throw new HttpError(403, 'Phiên giao diện đã cũ — hãy tải lại trang.');
+        if (req.headers['x-classrec-token'] !== token) throw new HttpError(403, t('Phiên giao diện đã cũ — hãy tải lại trang.'));
         const origin = req.headers.origin;
-        if (origin && !hosts.has(origin.replace(/^https?:\/\//, '').toLowerCase())) throw new HttpError(403, 'Nguồn yêu cầu không hợp lệ.');
+        if (origin && !hosts.has(origin.replace(/^https?:\/\//, '').toLowerCase())) throw new HttpError(403, t('Nguồn yêu cầu không hợp lệ.'));
       } else if (req.method !== 'GET') {
-        throw new HttpError(405, 'Không hỗ trợ.');
+        throw new HttpError(405, t('Không hỗ trợ.'));
       }
 
       if (req.method === 'GET' && (p === '/' || p === '/index.html')) {
-        const html = fs.readFileSync(UI_FILE, 'utf8').replace('__TOKEN__', token);
+        const html = fs.readFileSync(UI_FILE, 'utf8').replace('__LANG__', getLang()).replace('__TOKEN__', token).replace('__I18N__', () => JSON.stringify({ lang: getLang(), dict: dictionaryFor(getLang()) }).replace(/</g, '\\u003c'));
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
         return res.end(html);
       }
@@ -516,33 +527,33 @@ export async function startServer({ port = 8787, open = true } = {}) {
       // Màn hình trình duyệt của bot khi đăng nhập từ xa (noVNC): chuyển tiếp tới cổng nội bộ. Đã qua bước kiểm tra đăng nhập ở trên.
       if (req.method === 'GET' && p.startsWith('/vnc/')) {
         const vncPort = remoteLoginPort();
-        if (!vncPort) throw new HttpError(404, 'Không có phiên đăng nhập từ xa nào đang mở.');
+        if (!vncPort) throw new HttpError(404, t('Không có phiên đăng nhập từ xa nào đang mở.'));
         const up = http.request({ host: '127.0.0.1', port: vncPort, method: 'GET', path: req.url.slice(4), headers: { ...req.headers, host: `127.0.0.1:${vncPort}` } }, (r) => {
           res.writeHead(r.statusCode, r.headers);
           r.pipe(res);
         });
         up.on('error', () => {
-          if (!res.headersSent) send(502, { error: 'Màn hình từ xa chưa sẵn sàng.' });
+          if (!res.headersSent) send(502, { error: t('Màn hình từ xa chưa sẵn sàng.') });
           else res.end();
         });
         return up.end();
       }
       if (req.method === 'GET' && (m = /^\/api\/session\/([^/]+)$/.exec(p))) {
-        if (!ID_RX.test(m[1]) || !listSessions().includes(m[1])) throw new HttpError(404, 'Không tìm thấy buổi ghi.');
+        if (!ID_RX.test(m[1]) || !listSessions().includes(m[1])) throw new HttpError(404, t('Không tìm thấy buổi ghi.'));
         return send(200, sessionDetail(m[1]));
       }
       if (req.method === 'GET' && (m = /^\/api\/job\/([0-9a-f]+)$/.exec(p))) {
         const job = jobs.get(m[1]);
-        if (!job) throw new HttpError(404, 'Không tìm thấy tác vụ.');
+        if (!job) throw new HttpError(404, t('Không tìm thấy tác vụ.'));
         return send(200, job);
       }
       if (req.method === 'GET' && (m = /^\/files\/([^/]+)\/(.+)$/.exec(p))) {
-        if (!ID_RX.test(m[1]) || !FILE_RX.test(m[2]) || !listSessions().includes(m[1])) throw new HttpError(404, 'Không tìm thấy file.');
+        if (!ID_RX.test(m[1]) || !FILE_RX.test(m[2]) || !listSessions().includes(m[1])) throw new HttpError(404, t('Không tìm thấy file.'));
         return sendFile(req, res, path.join(sessionDir(m[1]), m[2]));
       }
 
       const handler = routes[`${req.method} ${p}`];
-      if (!handler) throw new HttpError(404, 'Không tìm thấy.');
+      if (!handler) throw new HttpError(404, t('Không tìm thấy.'));
       const body = req.method === 'POST' ? await readBody(req) : null;
       send(200, await handler(body));
     } catch (e) {
@@ -586,15 +597,15 @@ export async function startServer({ port = 8787, open = true } = {}) {
       for (const s of due) {
         markFired(list, s.id);
         if (atCapacity()) {
-          notify(`⏰ Tới giờ ghi "${s.title}" nhưng đã đủ ${maxParallel()} buổi ghi cùng lúc nên bỏ qua.`);
+          notify(t('⏰ Tới giờ ghi "{title}" nhưng đã đủ {n} buổi ghi cùng lúc nên bỏ qua.', { title: s.title, n: maxParallel() }));
           continue;
         }
         const id = startSession({ url: s.url, title: s.title, passcode: s.passcode, summary: s.summary });
-        console.log(`Lịch ghi tự động: bắt đầu "${s.title}" (${id})`);
+        console.log(t('Lịch ghi tự động: bắt đầu "{title}" ({id})', { title: s.title, id }));
       }
       saveSchedules(list);
     } catch (e) {
-      console.error(`Lỗi lịch ghi tự động: ${e.message}`);
+      console.error(t('Lỗi lịch ghi tự động: {error}', { error: e.message }));
     }
   };
   // Dọn buổi cũ và theo dõi dung lượng đĩa: mỗi giờ một lần (lần đầu sau 1 phút). Đọc cài đặt mới nhất từ .env mỗi lần.
@@ -606,17 +617,17 @@ export async function startServer({ port = 8787, open = true } = {}) {
       const r = cleanupOldSessions({ days, keepText: env.RETENTION_KEEP_TEXT !== 'false' });
       if (r.cleaned.length) {
         const gb = (r.freed / 1e9).toFixed(1);
-        notify(`🧹 Đã dọn ${r.cleaned.length} buổi ghi cũ hơn ${days} ngày (${env.RETENTION_KEEP_TEXT !== 'false' ? 'xoá video, giữ phiên âm và tóm tắt' : 'xoá hẳn'}), giải phóng ${gb} GB.`);
+        notify(t('🧹 Đã dọn {n} buổi ghi cũ hơn {days} ngày ({how}), giải phóng {gb} GB.', { n: r.cleaned.length, days, how: env.RETENTION_KEEP_TEXT !== 'false' ? t('xoá video, giữ phiên âm và tóm tắt') : t('xoá hẳn'), gb }));
       }
       const warnGb = Number(env.DISK_WARN_GB ?? 5);
       const free = diskFree();
       const today = new Date().toDateString();
       if (warnGb > 0 && free !== null && free < warnGb * 1e9 && lastDiskWarnDay !== today) {
         lastDiskWarnDay = today;
-        notify(`💾 Đĩa máy chủ chỉ còn ${(free / 1e9).toFixed(1)} GB trống. Hãy xoá bớt buổi ghi cũ hoặc bật tự dọn ở tab Cài đặt.`);
+        notify(t('💾 Đĩa máy chủ chỉ còn {gb} GB trống. Hãy xoá bớt buổi ghi cũ hoặc bật tự dọn ở tab Cài đặt.', { gb: (free / 1e9).toFixed(1) }));
       }
     } catch (e) {
-      console.error(`Lỗi dọn dẹp: ${e.message}`);
+      console.error(t('Lỗi dọn dẹp: {error}', { error: e.message }));
     }
   };
   // Đồng bộ lịch Google (nếu đã dán địa chỉ iCal): mỗi 10 phút, và khi bấm "Đồng bộ ngay".
@@ -629,11 +640,11 @@ export async function startServer({ port = 8787, open = true } = {}) {
     try {
       const r = await syncCalendar({ url: env.CALENDAR_ICS_URL, keyword: env.CALENDAR_KEYWORD || '', leadMin: Number(env.CALENDAR_LEAD_MIN ?? 5) });
       calendarState = { configured: true, at: new Date().toISOString(), ...r };
-      if (r.added) notify(`📅 Đã thêm ${r.added} lịch ghi từ lịch Google.`);
+      if (r.added) notify(t('📅 Đã thêm {n} lịch ghi từ lịch Google.', { n: r.added }));
     } catch (e) {
       const first = !calendarState.error;
       calendarState = { configured: true, at: new Date().toISOString(), error: e.message };
-      if (first) notify(`📅 Không đồng bộ được lịch Google: ${e.message}`);
+      if (first) notify(t('📅 Không đồng bộ được lịch Google: {error}', { error: e.message }));
     }
     return calendarState;
   };
@@ -666,14 +677,14 @@ export async function startServer({ port = 8787, open = true } = {}) {
     server.listen(port, '127.0.0.1', resolve);
   }).catch((e) => {
     if (e.code !== 'EADDRINUSE') throw e;
-    console.log(`Giao diện đã chạy sẵn ở ${address} — mở lại trang đó.`);
+    console.log(t('Giao diện đã chạy sẵn ở {address} — mở lại trang đó.', { address }));
     if (open) openInOS(address);
     return 'already';
   }).then((r) => {
     if (r === 'already') return;
-    console.log(`Class Recorder đang chạy tại ${address}`);
-    for (const h of config.uiPublicHosts) console.log(`Truy cập từ xa (qua proxy HTTPS, cần mật khẩu): https://${h}`);
-    console.log('Giữ cửa sổ này mở trong lúc dùng giao diện. Đóng cửa sổ không làm dừng buổi đang ghi.');
+    console.log(t('Class Recorder đang chạy tại {address}', { address }));
+    for (const h of config.uiPublicHosts) console.log(t('Truy cập từ xa (qua proxy HTTPS, cần mật khẩu): https://{h}', { h }));
+    console.log(t('Giữ cửa sổ này mở trong lúc dùng giao diện. Đóng cửa sổ không làm dừng buổi đang ghi.'));
     if (open) openInOS(address);
   });
   return server;
